@@ -7,6 +7,7 @@ const {
   getLedger,
   getTransactions,
 } = require('../controllers/analytics.controller');
+const { getHealthScore } = require('../controllers/health.controller');
 const { protect } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -20,5 +21,6 @@ router.get('/categories', getCategoryBreakdown);
 router.get('/forecast', getForecast);
 router.get('/ledger', getLedger);
 router.get('/transactions', getTransactions);
+router.get('/health-score', getHealthScore);
 
 module.exports = router;

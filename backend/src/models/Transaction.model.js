@@ -32,7 +32,16 @@ const transactionSchema = new mongoose.Schema(
       default: 'Uncategorized',
       trim: true,
     },
+    merchant: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     isRecurring: {
+      type: Boolean,
+      default: false,
+    },
+    isTaxDeductible: {
       type: Boolean,
       default: false,
     },

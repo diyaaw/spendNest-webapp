@@ -320,10 +320,55 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
                 out["credit"] = 0.0
                 out["debit"]  = 0.0
 
+    # ── Step 5.5: TYPE FLAG COLUMN ────────────────────────────────────────────
+    # Handles CSVs like: Date, Description, Type, Amount (INR), Balance (INR)
+    # where the "Type" column holds "Credit" or "Debit" text values.
+    # When found, apply it to negate Debit amounts so expenses are negative.
+    TYPE_FLAG_CANDIDATES = [
+        "type", "transaction type", "txn type", "trans type",
+        "dr/cr", "cr/dr", "dr_cr", "credit/debit", "debit/credit",
+        "transaction_type", "txn_type",
+    ]
+    type_flag_col = None
+    for candidate in TYPE_FLAG_CANDIDATES:
+        for col in df.columns:
+            if col.lower().strip() == candidate.lower():
+                col_vals = df[col].astype(str).str.strip().str.lower()
+                # Ignore empty rows when calculating hit rate
+                valid_mask = col_vals != "nan"
+                valid_mask = valid_mask & (col_vals != "")
+                valid_count = max(valid_mask.sum(), 1)
+                
+                hit_rate = col_vals.isin(["credit", "debit", "cr", "dr"]).sum() / valid_count
+                if hit_rate >= 0.3:
+                    type_flag_col = col
+                    logger.info("🏷️  Type-flag column detected: '%s' (hit rate: %.0f%%)", col, hit_rate * 100)
+                    break
+        if type_flag_col:
+            break
+
+    if type_flag_col is not None:
+        type_vals = df[type_flag_col].astype(str).str.strip().str.lower()
+        is_debit = type_vals.isin(["debit", "dr"])
+        is_credit = type_vals.isin(["credit", "cr"])
+        
+        # Negate amounts for debit rows (make them negative = expenses)
+        # and enforce positive for credit rows
+        out["amount"] = out["amount"].where(~is_debit, -out["amount"].abs())
+        out["amount"] = out["amount"].where(~is_credit, out["amount"].abs())
+        
+        # Also fix debit/credit columns if they were already set
+        if "debit" in out.columns:
+            out["debit"]  = out["amount"].abs().where(is_debit, 0.0)
+        if "credit" in out.columns:
+            out["credit"] = out["amount"].abs().where(is_credit, 0.0)
+        logger.info("✅ Applied type-flag sign correction (debit rows: %d, credit rows: %d)", is_debit.sum(), is_credit.sum())
+
     # ── Step 6: TYPE ─────────────────────────────────────────────────────────
     out["type"] = out["amount"].apply(
         lambda x: "income" if x > 0 else ("expense" if x < 0 else "transfer")
     )
+
 
     # ── Step 7: Drop junk rows ───────────────────────────────────────────────
     # Drop rows where date is null (critical for time series)

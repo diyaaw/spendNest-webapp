@@ -25,16 +25,18 @@ export default function LoginPage() {
     try {
       if (mode === 'register') {
         await register(name, email, password);
+        router.replace('/onboarding');
       } else {
         await login(email, password);
+        router.replace('/dashboard');
       }
-      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">

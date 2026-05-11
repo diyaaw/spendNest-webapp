@@ -1,3 +1,5 @@
+const CURRENCY_SYMBOL = '₹';
+
 interface Props {
   title: string;
   amount: number;
@@ -34,9 +36,10 @@ export default function KpiCard({ title, amount, subtext, icon, isHighlight, siz
       </div>
       
       <div className={`${isLarge ? 'text-4xl' : 'text-2xl'} font-black tracking-tighter flex items-baseline gap-1`}>
-        <span className={isHighlight ? 'text-blue-200 text-2xl' : 'text-slate-400 text-xl'}>$</span>
-        {amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <span className={isHighlight ? 'text-blue-200 text-2xl' : 'text-slate-400 text-xl'}>{CURRENCY_SYMBOL}</span>
+        {amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
+
 
       {!isLarge && subtext && (
         <p className={`text-[11px] mt-4 leading-relaxed font-medium ${isHighlight ? 'text-blue-100' : 'text-slate-400'}`}>

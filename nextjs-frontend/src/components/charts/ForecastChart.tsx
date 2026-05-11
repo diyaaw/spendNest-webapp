@@ -50,8 +50,31 @@ export default function ForecastChart({ forecastData }: { forecastData: Forecast
     );
   }
 
-  const { historical_income, predicted_month, predicted_income, model_used } = forecastData;
-  
+  // Bug 5 fix: graceful fallback when forecast failed or returned 'Error' as month
+  const forecastFailed =
+    forecastData.predicted_month === 'Error' ||
+    forecastData.predicted_month === 'error' ||
+    (forecastData.predicted_income === 0 && forecastData.historical_income.length === 0);
+
+  if (forecastFailed) {
+    return (
+      <div className="bg-white p-8 rounded-[32px] border border-amber-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] h-full min-h-[26rem] flex items-center justify-center text-center">
+        <div className="max-w-md">
+          <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h4 className="text-lg font-black text-slate-900 mb-2">Insufficient Data for Forecast</h4>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Upload at least 2 months of transactions to generate an accurate AI income forecast.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+
   const chartData = [
     ...historical_income.map(d => ({ ...d, isForecast: false })),
     { month: predicted_month, income: predicted_income, isForecast: true }
@@ -72,7 +95,7 @@ export default function ForecastChart({ forecastData }: { forecastData: Forecast
             </h3>
           </div>
           <p className="text-2xl font-black text-slate-900">
-            ${forecastData.predicted_income.toLocaleString()}
+            ₹{forecastData.predicted_income.toLocaleString('en-IN')}
             <span className="text-slate-300 text-sm font-medium ml-2 italic">for {forecastData.predicted_month}</span>
           </p>
         </div>
@@ -108,7 +131,7 @@ export default function ForecastChart({ forecastData }: { forecastData: Forecast
               contentStyle={{ backgroundColor: '#ffffff', border: 'none', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
               itemStyle={{ fontSize: '12px', fontWeight: 700 }}
               formatter={(value: any, name: any, props: any) => [
-                `$${Number(value).toLocaleString()}`, 
+                `₹${Number(value).toLocaleString('en-IN')}`, 
                 props.payload.isForecast ? `Predicted ${metricLabel}` : `Historical ${metricLabel}`
               ]}
             />
@@ -120,7 +143,8 @@ export default function ForecastChart({ forecastData }: { forecastData: Forecast
               fillOpacity={1}
               fill="url(#colorForecast)"
               animationDuration={1500}
-              strokeDasharray={(props: any) => props.payload?.isForecast ? "8 5" : "0"}
+              strokeDasharray="0"
+
             />
           </AreaChart>
         </ResponsiveContainer>

@@ -2,15 +2,13 @@
 //
 // WHY ABSOLUTE URLS:
 // All Express calls use the absolute backend URL (http://localhost:5000) directly.
-// This is critical for cookie-based auth — if we used relative URLs (/api/...),
-// the request would go through the Next.js server-side proxy, which does NOT
-// forward the browser's cookie jar. The browser would never receive or send
-// the httpOnly auth cookie. Absolute URLs let the browser handle cookies natively.
+// This is critical for cookie-based auth — relative URLs would go through the
+// Next.js server-side proxy which doesn't forward the browser's cookie jar.
 //
-// FastAPI ML endpoints (analytics) also use absolute URLs for the same reason.
+// FastAPI ML endpoints also use absolute URLs for the same reason.
 
 const EXPRESS = process.env.NEXT_PUBLIC_API_URL!;          // http://localhost:5000
-const FASTAPI  = process.env.NEXT_PUBLIC_FASTAPI_URL ?? ''; // http://localhost:8000 (optional)
+const FASTAPI  = process.env.NEXT_PUBLIC_FASTAPI_URL ?? ''; // http://localhost:8000
 
 // ─── Internal helper ──────────────────────────────────────────────────────────
 
@@ -48,15 +46,25 @@ export const logout = () =>
 export const getMe = () =>
   fetchJson(`${EXPRESS}/api/auth/me`);
 
+// ─── Onboarding ───────────────────────────────────────────────────────────────
+
+export const updateOnboardingProfile = (fields: Record<string, unknown>) =>
+  fetchJson(`${EXPRESS}/api/auth/onboarding`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  });
+
+export const getOnboardingProfile = () =>
+  fetchJson(`${EXPRESS}/api/auth/onboarding`);
+
 // ─── Upload ───────────────────────────────────────────────────────────────────
-// POST /api/upload — Express receives CSV, calls FastAPI internally, saves to MongoDB.
-// Returns: { uploadId, filename, rowCount, summary }
+// POST /api/upload — Express receives CSV, calls FastAPI, saves to MongoDB.
 
 export const uploadCsvFile = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  // Do NOT set Content-Type header — browser sets it automatically with boundary
   const res = await fetch(`${EXPRESS}/api/upload`, {
     method: 'POST',
     body: formData,
@@ -71,7 +79,7 @@ export const uploadCsvFile = async (file: File) => {
   const uploadResult = await res.json();
   // uploadResult = { uploadId, filename, rowCount, summary }
 
-  // Fetch the full dashboard payload from Express analytics endpoints
+  // Fetch the full dashboard payload using this specific uploadId
   const dashboardData = await fetchDashboardData(uploadResult.uploadId);
   return { ...dashboardData, filename: uploadResult.filename };
 };
@@ -90,29 +98,86 @@ const tryFetchJson = async (url: string): Promise<any | null> => {
   }
 };
 
+/**
+ * Normalize the backend forecast response to the flat shape the frontend expects.
+ * Backend:  { model, generatedAt, predictions: [{ month, predictedIncome, recommendedSaveRate }] }
+ * Frontend: { predicted_income, predicted_month, model_used }
+ */
+const normalizeForecast = (raw: any): any => {
+  if (!raw) return null;
+  // Already flat (from in-memory store) — return as-is
+  if (raw.predicted_income !== undefined) return raw;
+  // Normalize from DB shape
+  const pred = Array.isArray(raw.predictions) ? raw.predictions[0] : null;
+  if (!pred) return null;
+  return {
+    predicted_income: pred.predictedIncome ?? pred.predicted_income ?? 0,
+    predicted_month: pred.month ?? pred.predicted_month ?? 'Next Month',
+    model_used: raw.model ?? raw.model_used ?? 'SMA',
+    recommendedSaveRate: pred.recommendedSaveRate ?? 0.10,
+  };
+};
+
+/**
+ * Normalize the backend ledger response to the recommendation shape the frontend expects.
+ * Backend:  { month, totalIncome, totalExpenses, safe_to_spend, reserved_funds, emergency_buffer, recommended_reserve_rate }
+ * Frontend: recommendation.safe_to_spend, recommendation.message, etc.
+ */
+const normalizeLedger = (raw: any, forecast: any): any => {
+  if (!raw) return null;
+  // Already has the message field (from in-memory) — return as-is
+  if (raw.message !== undefined) return raw;
+  const reserved = raw.reserved_funds ?? raw.quarantinedForTaxes ?? 0;
+  return {
+    safe_to_spend: raw.safe_to_spend ?? raw.availableToSpend ?? 0,
+    reserved_funds: reserved,
+    emergency_buffer: raw.emergency_buffer ?? raw.emergencyBuffer ?? 0,
+    recommended_reserve_rate: raw.recommended_reserve_rate ?? raw.saveRate ?? 0.10,
+    message: `Keep ₹${Math.round(reserved).toLocaleString('en-IN')} reserved for taxes & emergencies.`,
+    current_balance: (raw.totalIncome ?? 0) - (raw.totalExpenses ?? 0),
+    predicted_income: forecast?.predicted_income ?? 0,
+  };
+};
+
 export const fetchDashboardData = async (uploadId?: string) => {
   const qs = uploadId ? `?uploadId=${uploadId}` : '';
 
-  // Use individual try/catch via tryFetchJson so a missing forecast or ledger
-  // record (404) does NOT abort the entire dashboard load.
-  const [summary, monthly, category, forecast, ledger, txResult] = await Promise.all([
-    fetchJson(`${EXPRESS}/api/analytics/summary${qs}`),        // required — throws on fail
-    tryFetchJson(`${EXPRESS}/api/analytics/monthly${qs}`),     // optional
-    tryFetchJson(`${EXPRESS}/api/analytics/categories${qs}`),  // optional
-    tryFetchJson(`${EXPRESS}/api/analytics/forecast${qs}`),    // optional (may be null)
-    tryFetchJson(`${EXPRESS}/api/analytics/ledger${qs}`),      // optional (may be null)
-    fetchJson(`${EXPRESS}/api/analytics/transactions${qs}`),   // required — throws on fail
+  // summary and transactions are required; the rest gracefully degrade to null/[]
+  const [summary, monthly, category, forecastRaw, ledgerRaw, txResult] = await Promise.all([
+    fetchJson(`${EXPRESS}/api/analytics/summary${qs}`),
+    tryFetchJson(`${EXPRESS}/api/analytics/monthly${qs}`),
+    tryFetchJson(`${EXPRESS}/api/analytics/categories${qs}`),
+    tryFetchJson(`${EXPRESS}/api/analytics/forecast${qs}`),
+    tryFetchJson(`${EXPRESS}/api/analytics/ledger${qs}`),
+    fetchJson(`${EXPRESS}/api/analytics/transactions${qs}`),
   ]);
+
+  const forecast = normalizeForecast(forecastRaw);
+  const recommendation = normalizeLedger(ledgerRaw, forecast);
 
   return {
     summary,
     monthly:         monthly   ?? [],
     category:        category  ?? [],
-    forecast:        forecast  ?? null,
-    recommendation:  ledger    ?? null,
+    forecast,
+    recommendation,
     allTransactions: txResult?.transactions ?? [],
   };
 };
+
+// ─── Tax Estimator ────────────────────────────────────────────────────────────
+
+export const fetchTaxEstimate = (params?: { regime?: 'old' | 'new'; annualIncome?: number }) => {
+  const qs = new URLSearchParams();
+  if (params?.regime) qs.set('regime', params.regime);
+  if (params?.annualIncome) qs.set('annualIncome', String(params.annualIncome));
+  return fetchJson(`${EXPRESS}/api/tax/estimate?${qs.toString()}`);
+};
+
+// ─── Financial Health Score ───────────────────────────────────────────────────
+
+export const fetchHealthScore = () =>
+  fetchJson(`${EXPRESS}/api/analytics/health-score`);
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 

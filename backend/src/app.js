@@ -4,9 +4,13 @@ const cookieParser = require('cookie-parser');
 const errorHandler = require('./middlewares/error.middleware');
 
 // Route imports
-const authRoutes = require('./routes/auth.routes');
-const uploadRoutes = require('./routes/upload.routes');
-const analyticsRoutes = require('./routes/analytics.routes');
+const authRoutes         = require('./routes/auth.routes');
+const uploadRoutes       = require('./routes/upload.routes');
+const analyticsRoutes    = require('./routes/analytics.routes');
+const taxRoutes          = require('./routes/tax.routes');
+const subscriptionRoutes = require('./routes/subscription.routes');
+const emergencyFundRoutes = require('./routes/emergencyFund.routes');
+
 
 const app = express();
 
@@ -28,9 +32,13 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── Routes ──────────────────────────────────────────────────────
-app.use('/api/auth', authRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/analytics', analyticsRoutes);
+app.use('/api/auth',           authRoutes);
+app.use('/api/upload',         uploadRoutes);
+app.use('/api/analytics',      analyticsRoutes);
+app.use('/api/tax',            taxRoutes);
+app.use('/api/subscriptions',  subscriptionRoutes);
+app.use('/api/emergency-fund', emergencyFundRoutes);
+
 
 // ─── Global Error Handler ────────────────────────────────────────
 app.use(errorHandler);

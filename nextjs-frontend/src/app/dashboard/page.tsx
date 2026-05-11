@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useSpendNestStore } from '@/store/useSpendNestStore';
+import { fetchHealthScore, fetchTaxEstimate } from '@/lib/api';
 import UploadZone from '@/components/dashboard/UploadZone';
 import KpiCard from '@/components/dashboard/KpiCard';
 import MonthlyChart from '@/components/charts/MonthlyChart';
@@ -8,9 +10,15 @@ import CategoryPieChart from '@/components/charts/CategoryPieChart';
 import ForecastChart from '@/components/charts/ForecastChart';
 import TransactionTable from '@/components/dashboard/TransactionTable';
 import InsightsCard from '@/components/dashboard/InsightsCard';
+import HealthScoreCard from '@/components/dashboard/HealthScoreCard';
+import TaxEstimatorCard from '@/components/dashboard/TaxEstimatorCard';
+import SubscriptionTracker from '@/components/dashboard/SubscriptionTracker';
+import EmergencyFundTracker from '@/components/dashboard/EmergencyFundTracker';
 import ClientOnly from '@/components/ClientOnly';
 
-// Loading skeleton — identical structure to the original Dashboard.jsx skeleton
+
+// ── Loading skeleton ───────────────────────────────────────────────────────────
+
 function DashboardSkeleton() {
   return (
     <div className="w-full max-w-7xl mx-auto animate-pulse pb-12 pt-8 px-4">
@@ -23,23 +31,40 @@ function DashboardSkeleton() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
-        <div className="lg:col-span-1 h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
+        <div className="h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
+        <div className="h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
         <div className="lg:col-span-2 h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
       </div>
     </div>
   );
 }
 
-function DashboardContent() {
-  const { data, clearDashboardData } = useSpendNestStore();
+// ── Main dashboard ─────────────────────────────────────────────────────────────
 
-  // DEBUG: Check the data shape in the browser console
-  if (typeof window !== 'undefined' && data) {
-    console.log("SpendNest Data Object:", data);
-  }
+function DashboardContent() {
+  const { data, isHydrating, clearDashboardData, healthScore, setHealthScore } = useSpendNestStore();
+  const [taxData, setTaxData] = useState<any>(null);
+
+  // Fetch health score and tax estimate once data is loaded
+  useEffect(() => {
+    if (!data) return;
+
+    // Fetch health score from backend
+    fetchHealthScore()
+      .then((score) => setHealthScore(score))
+      .catch(() => {});
+
+    // Derive annual income from transaction summary for tax card
+    const annualIncome = data.summary?.total_income
+      ? data.summary.total_income * 12  // approximate annualised
+      : 0;
+    setTaxData({ annualIncome });
+  }, [data]);
+
+  // Show skeleton while hydrating from MongoDB (not the "Upload CSV" empty state)
+  if (isHydrating) return <DashboardSkeleton />;
 
   if (!data) {
     return (
@@ -58,24 +83,24 @@ function DashboardContent() {
   }
 
   const { summary, monthly, category, forecast, recommendation, allTransactions, filename } = data;
-
-  const monthlyData = monthly ?? (data as any).monthly_analytics ?? [];
-  const categoryData = category ?? (data as any).category_breakdown ?? [];
-  const transactions = allTransactions ?? (data as any).transactions ?? [];
+  const monthlyData = monthly ?? [];
+  const categoryData = category ?? [];
+  const transactions = allTransactions ?? [];
+  const annualIncome = (summary?.total_income ?? 0) * 12;
 
   return (
     <div className="w-full max-w-7xl mx-auto pb-16 px-6 pt-10 space-y-10">
 
-      {/* 1. Header Section */}
+      {/* ── 1. Header ─────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Your Financial Status</h2>
           <div className="flex items-center gap-2 mt-2">
-             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-             <p className="text-sm text-slate-500">
-               Live analysis of <span className="text-slate-900 font-bold">{summary?.total_transactions ?? 0}</span> transactions
-               {filename && <> from <span className="text-blue-600 font-medium">{filename}</span></>}.
-             </p>
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <p className="text-sm text-slate-500">
+              Live analysis of <span className="text-slate-900 font-bold">{summary?.total_transactions ?? 0}</span> transactions
+              {filename && <> from <span className="text-blue-600 font-medium">{filename}</span></>}.
+            </p>
           </div>
         </div>
         <button
@@ -86,13 +111,13 @@ function DashboardContent() {
         </button>
       </div>
 
-      {/* 2. Hero KPIs: Current Balance & Safe-to-Spend */}
+      {/* ── 2. Hero KPIs ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <KpiCard
             title="Available Balance"
             amount={summary?.latest_balance ?? 0}
-            subtext="The total amount currently reflected in your accounts."
+            subtext="Total amount reflected in your accounts."
             size="lg"
             icon={
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
@@ -105,7 +130,7 @@ function DashboardContent() {
           <KpiCard
             title="You Can Safely Spend"
             amount={recommendation?.safe_to_spend ?? 0}
-            subtext={recommendation?.message || "Estimated amount you can spend after covering bills and savings goals."}
+            subtext={recommendation?.message || 'Estimated amount after covering bills and savings goals.'}
             isHighlight
             size="lg"
             icon={
@@ -117,16 +142,12 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* 3. Monthly Pulse Grid */}
+      {/* ── 3. Monthly KPI grid ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KpiCard
-          title="Income This Month"
-          amount={summary?.total_income ?? 0}
+        <KpiCard title="Income This Month" amount={summary?.total_income ?? 0}
           icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>}
         />
-        <KpiCard
-          title="Expenses This Month"
-          amount={summary?.total_expenses ?? 0}
+        <KpiCard title="Expenses This Month" amount={summary?.total_expenses ?? 0}
           icon={<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-rose-500"><path d="m19 12-7 7-7-7"/><path d="M12 5v14"/></svg>}
         />
         <KpiCard
@@ -143,7 +164,7 @@ function DashboardContent() {
         />
       </div>
 
-      {/* 4. Trends & Analysis */}
+      {/* ── 4. Trends & Insights ──────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <MonthlyChart data={monthlyData} />
@@ -153,7 +174,17 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* 5. Categories & Future */}
+      {/* ── 5. Health Score + Tax Estimator (NEW) ─────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div className="lg:col-span-2">
+          <HealthScoreCard score={healthScore} />
+        </div>
+        <div className="lg:col-span-3">
+          <TaxEstimatorCard annualIncome={annualIncome} />
+        </div>
+      </div>
+
+      {/* ── 6. Category & Forecast ────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
           <CategoryPieChart data={categoryData} />
@@ -163,15 +194,25 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* 6. Recent Activity */}
+      {/* ── 7. Recent Transactions ────────────────────────────────────── */}
       <div className="pt-4">
         <TransactionTable transactions={transactions} />
       </div>
 
+      {/* ── 8. Bill Tracker + Emergency Fund (NEW) ────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div className="lg:col-span-3">
+          <SubscriptionTracker />
+        </div>
+        <div className="lg:col-span-2">
+          <EmergencyFundTracker />
+        </div>
+      </div>
+
     </div>
+
   );
 }
-
 
 export default function DashboardPage() {
   return (
