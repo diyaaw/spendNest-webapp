@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction.model');
+const FinancialHealth = require('../models/FinancialHealth.model');
 
 const isDbConnected = () => mongoose.connection.readyState === 1;
 
@@ -74,7 +75,11 @@ const getHealthScore = async (req, res, next) => {
     const monthsWithIncome = months.filter((m) => m.income > 0).length;
     const incomeScore = Math.min(15, Math.round((monthsWithIncome / N) * 15));
 
-    const overall = savingsScore + spendingScore + emergencyScore + taxScore + incomeScore;
+    const overall = Math.max(0, savingsScore) + 
+                    Math.max(0, spendingScore) + 
+                    Math.max(0, emergencyScore) + 
+                    Math.max(0, taxScore) + 
+                    Math.max(0, incomeScore);
 
     const label = overall >= 75 ? 'Excellent' : overall >= 50 ? 'Good' : overall >= 25 ? 'Fair' : 'At Risk';
 
@@ -86,6 +91,8 @@ const getHealthScore = async (req, res, next) => {
     if (incomeScore < 10) recommendations.push('Income was 0 in some months. Diversify your client base for stability.');
     if (!recommendations.length) recommendations.push('Your financial health is excellent. Keep it up!');
 
+    const healthDoc = await FinancialHealth.findOne({ userId });
+    
     res.json({
       overall,
       savingsScore,
@@ -95,6 +102,8 @@ const getHealthScore = async (req, res, next) => {
       incomeScore,
       label,
       recommendations,
+      insights: healthDoc?.insights || [],
+      trends:   healthDoc?.trends   || {},
       meta: {
         monthsAnalyzed: N,
         totalIncome: Math.round(totalIncome),

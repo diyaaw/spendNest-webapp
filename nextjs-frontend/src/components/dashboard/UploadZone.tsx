@@ -11,6 +11,7 @@ export default function UploadZone() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [bankName, setBankName] = useState('Main Account');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setDashboardData } = useSpendNestStore();
 
@@ -31,7 +32,7 @@ export default function UploadZone() {
     setIsUploading(true);
     setError('');
     try {
-      const data = await uploadCsvFile(file);
+      const data = await uploadCsvFile(file, bankName);
       setDashboardData(data);
       router.refresh(); // re-render dashboard page with new data
     } catch (err: any) {
@@ -83,7 +84,18 @@ export default function UploadZone() {
         {file && !error ? (
           <>
             <h3 className="text-xl font-bold text-slate-900 mb-2">{file.name}</h3>
-            <p className="text-slate-500 text-sm mb-8">Ready for analysis</p>
+            <div className="mb-6 w-full max-w-xs mx-auto">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 text-left">Bank / Account Name</label>
+              <input 
+                type="text" 
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="e.g. ICICI, HDFC, Chase"
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+            <p className="text-slate-500 text-sm mb-6">Ready for analysis</p>
             <button
               onClick={(e) => { e.stopPropagation(); handleUploadClick(); }}
               disabled={isUploading}

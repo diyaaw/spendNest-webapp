@@ -137,9 +137,9 @@ const ILLUSTRATIONS: Record<number, React.ReactElement> = {
       {/* Coins */}
       <circle cx="155" cy="75" r="12" fill="#FBBF24" opacity="0.9" />
       <circle cx="155" cy="75" r="8" fill="#F59E0B" />
-      <text x="155" y="79" textAnchor="middle" fontSize="10" fontWeight="800" fill="#92400E">$</text>
+      <text x="155" y="79" textAnchor="middle" fontSize="10" fontWeight="800" fill="#92400E">₹</text>
       <circle cx="78" cy="72" r="9" fill="#FBBF24" opacity="0.7" />
-      <text x="78" y="76" textAnchor="middle" fontSize="8" fontWeight="800" fill="#92400E">$</text>
+      <text x="78" y="76" textAnchor="middle" fontSize="8" fontWeight="800" fill="#92400E">₹</text>
       {/* Sparkles */}
       <circle cx="172" cy="130" r="4" fill="#FCD34D" opacity="0.6" />
       <circle cx="60" cy="140" r="3" fill="#F59E0B" opacity="0.5" />

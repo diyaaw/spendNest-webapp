@@ -94,12 +94,13 @@ def get_income_forecast(df: pd.DataFrame) -> dict:
     last_overall_period = temp_df['month_sort'].max()
     predicted_month_label = (last_overall_period + 1).strftime('%b %Y')
 
-    if not historical_data:
+    if not historical_data or len(historical_data) < 2:
         return {
-            "historical_income": [],
+            "historical_income": historical_data,
             "predicted_month": predicted_month_label,
             "predicted_income": 0.0,
             "model_used": "none",
+            "error": "Insufficient data for forecast. Upload at least 2 months of transactions."
         }
 
     income_series = np.array([item['income'] for item in historical_data])

@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CURRENCY_SYMBOL } from '@/lib/utils';
 
-const fmt = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
+const fmt = (n: number) => CURRENCY_SYMBOL + Math.round(n).toLocaleString('en-IN');
 const EXPRESS = process.env.NEXT_PUBLIC_API_URL!;
 
 const CATEGORY_META: Record<string, { icon: string; color: string; bg: string }> = {
@@ -160,8 +161,8 @@ export default function SubscriptionTracker() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-10">
           <p className="text-4xl mb-3">📭</p>
-          <p className="text-white/30 text-sm">No subscriptions detected yet.</p>
-          <p className="text-white/20 text-xs mt-1">Click Detect to scan your transactions.</p>
+          <p className="text-white/30 text-sm">No recurring subscriptions detected.</p>
+          <p className="text-white/20 text-xs mt-1">Upload your bank statement and click Detect to scan.</p>
         </div>
       ) : (
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpendNestStore } from '@/store/useSpendNestStore';
+import InsightsList from './InsightsList';
 
 // ── Colour mapping ─────────────────────────────────────────────────────────────
 
@@ -90,7 +91,11 @@ interface Props {
     taxScore: number;
     incomeScore: number;
     label: string;
-    recommendations: string[];
+    insights?: string[];
+    trends?: {
+      weekend_vs_weekday_pct?: number;
+      rising_categories?: string[];
+    };
     meta?: {
       savingsRate: number;
       monthsRunway: number;
@@ -199,6 +204,13 @@ export default function HealthScoreCard({ score, loading }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* AI Insights & Trends */}
+      {(score.insights?.length > 0 || score.trends) && (
+        <div className="mt-8 pt-6 border-t border-white/5">
+          <InsightsList insights={score.insights || []} trends={score.trends} />
+        </div>
+      )}
     </div>
   );
 }

@@ -61,9 +61,10 @@ export const getOnboardingProfile = () =>
 // ─── Upload ───────────────────────────────────────────────────────────────────
 // POST /api/upload — Express receives CSV, calls FastAPI, saves to MongoDB.
 
-export const uploadCsvFile = async (file: File) => {
+export const uploadCsvFile = async (file: File, bankName?: string) => {
   const formData = new FormData();
   formData.append('file', file);
+  if (bankName) formData.append('bankName', bankName);
 
   const res = await fetch(`${EXPRESS}/api/upload`, {
     method: 'POST',
@@ -182,3 +183,24 @@ export const fetchHealthScore = () =>
 // ─── Health ───────────────────────────────────────────────────────────────────
 
 export const checkHealth = () => fetchJson(`${EXPRESS}/api/health`);
+
+// ─── AI Advisor ───────────────────────────────────────────────────────────────
+
+export const chatWithAI = (message: string) =>
+  fetchJson(`${EXPRESS}/api/ai/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+
+// ─── Budgets ──────────────────────────────────────────────────────────────────
+
+export const fetchBudgets = (month?: string) =>
+  fetchJson(`${EXPRESS}/api/budgets${month ? `?month=${month}` : ''}`);
+
+export const setBudgetCategoryLimit = (category: string, budgetLimit: number, month?: string) =>
+  fetchJson(`${EXPRESS}/api/budgets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category, budgetLimit, month }),
+  });

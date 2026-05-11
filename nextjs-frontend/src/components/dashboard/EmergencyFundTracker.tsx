@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CURRENCY_SYMBOL } from '@/lib/utils';
 
-const fmt = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
+const fmt = (n: number) => CURRENCY_SYMBOL + Math.round(n).toLocaleString('en-IN');
 const EXPRESS = process.env.NEXT_PUBLIC_API_URL!;
 
 function riskStyle(level: string) {

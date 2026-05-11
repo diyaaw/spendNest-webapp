@@ -125,7 +125,7 @@ const updateOnboarding = async (req, res, next) => {
     }
 
     if (isDbConnected()) {
-      await User.findByIdAndUpdate(req.user._id, { $set: updates }, { new: true, runValidators: true });
+      await User.findByIdAndUpdate(req.user._id, { $set: updates }, { returnDocument: 'after', runValidators: true });
     }
     // In-memory store doesn't have update — silently succeed
     res.status(200).json({ message: 'Profile updated', updates });

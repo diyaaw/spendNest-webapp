@@ -1,4 +1,4 @@
-const CURRENCY_SYMBOL = '₹';
+import { CURRENCY_SYMBOL } from '@/lib/utils';
 
 interface Props {
   title: string;

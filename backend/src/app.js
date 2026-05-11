@@ -10,6 +10,8 @@ const analyticsRoutes    = require('./routes/analytics.routes');
 const taxRoutes          = require('./routes/tax.routes');
 const subscriptionRoutes = require('./routes/subscription.routes');
 const emergencyFundRoutes = require('./routes/emergencyFund.routes');
+const budgetRoutes        = require('./routes/budget.routes');
+const aiRoutes            = require('./routes/ai.routes');
 
 
 const app = express();
@@ -38,6 +40,8 @@ app.use('/api/analytics',      analyticsRoutes);
 app.use('/api/tax',            taxRoutes);
 app.use('/api/subscriptions',  subscriptionRoutes);
 app.use('/api/emergency-fund', emergencyFundRoutes);
+app.use('/api/budgets',        budgetRoutes);
+app.use('/api/ai',             aiRoutes);
 
 
 // ─── Global Error Handler ────────────────────────────────────────

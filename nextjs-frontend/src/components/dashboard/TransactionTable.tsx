@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import type { Transaction } from '@/types';
+import { CURRENCY_SYMBOL } from '@/lib/utils';
 
 const getCategoryColor = (category: string) => {
   const colors: Record<string, string> = {
@@ -109,6 +110,7 @@ export default function TransactionTable({ transactions }: { transactions: Trans
               <th className="px-8 py-5">Date</th>
               <th className="px-8 py-5">Description</th>
               <th className="px-8 py-5">Category</th>
+              <th className="px-8 py-5">Bank</th>
               <th className="px-8 py-5 text-right">Amount</th>
               <th className="px-8 py-5 text-right">Final Balance</th>
             </tr>
@@ -126,11 +128,23 @@ export default function TransactionTable({ transactions }: { transactions: Trans
                       {tx.category || 'Other'}
                     </span>
                   </td>
+                  <td className="px-8 py-6 whitespace-nowrap">
+                    <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                      {(tx as any).bank || 'Main Account'}
+                    </span>
+                  </td>
                   <td className={`px-8 py-6 text-base font-black text-right whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                    {tx.type === 'income' ? '+' : '-'}${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    <div className="flex flex-col items-end">
+                      <span>{tx.type === 'income' ? '+' : '-'}{CURRENCY_SYMBOL}{Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      {tx.isAnomaly && (
+                        <span className="text-[9px] font-black bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded mt-1 uppercase tracking-tighter">
+                          Anomaly ⚠️
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-8 py-6 text-sm text-slate-400 text-right font-bold whitespace-nowrap">
-                    ${(tx.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {CURRENCY_SYMBOL}{(tx.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
               ))

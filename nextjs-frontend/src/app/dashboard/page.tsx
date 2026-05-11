@@ -13,8 +13,10 @@ import InsightsCard from '@/components/dashboard/InsightsCard';
 import HealthScoreCard from '@/components/dashboard/HealthScoreCard';
 import TaxEstimatorCard from '@/components/dashboard/TaxEstimatorCard';
 import SubscriptionTracker from '@/components/dashboard/SubscriptionTracker';
+import BudgetTracker from '@/components/dashboard/BudgetTracker';
 import EmergencyFundTracker from '@/components/dashboard/EmergencyFundTracker';
 import ClientOnly from '@/components/ClientOnly';
+import FinancialAdvisor from '@/components/dashboard/FinancialAdvisor';
 
 
 // ── Loading skeleton ───────────────────────────────────────────────────────────
@@ -194,6 +196,11 @@ function DashboardContent() {
         </div>
       </div>
 
+      {/* ── 7. Budget Tracking (NEW) ───────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
+        <BudgetTracker categories={categoryData} />
+      </div>
+
       {/* ── 7. Recent Transactions ────────────────────────────────────── */}
       <div className="pt-4">
         <TransactionTable transactions={transactions} />
@@ -209,6 +216,8 @@ function DashboardContent() {
         </div>
       </div>
 
+      {/* ── 9. AI Advisor (Floating) ──────────────────────────────────── */}
+      <FinancialAdvisor />
     </div>
 
   );

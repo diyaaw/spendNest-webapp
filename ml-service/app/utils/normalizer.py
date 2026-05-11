@@ -349,8 +349,13 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
 
     if type_flag_col is not None:
         type_vals = df[type_flag_col].astype(str).str.strip().str.lower()
-        is_debit = type_vals.isin(["debit", "dr"])
-        is_credit = type_vals.isin(["credit", "cr"])
+        
+        # Expanded keyword list for better detection
+        DEBIT_KEYWORDS = ["debit", "dr", "withdrawal", "payment", "wdr", "dr amt", "out", "expense"]
+        CREDIT_KEYWORDS = ["credit", "cr", "deposit", "receipt", "dep", "cr amt", "in", "income"]
+        
+        is_debit = type_vals.isin(DEBIT_KEYWORDS)
+        is_credit = type_vals.isin(CREDIT_KEYWORDS)
         
         # Negate amounts for debit rows (make them negative = expenses)
         # and enforce positive for credit rows
@@ -359,9 +364,10 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
         
         # Also fix debit/credit columns if they were already set
         if "debit" in out.columns:
-            out["debit"]  = out["amount"].abs().where(is_debit, 0.0)
+            out["debit"]  = out["amount"].abs().where(is_debit, out["debit"])
         if "credit" in out.columns:
-            out["credit"] = out["amount"].abs().where(is_credit, 0.0)
+            out["credit"] = out["amount"].abs().where(is_credit, out["credit"])
+        
         logger.info("✅ Applied type-flag sign correction (debit rows: %d, credit rows: %d)", is_debit.sum(), is_credit.sum())
 
     # ── Step 6: TYPE ─────────────────────────────────────────────────────────

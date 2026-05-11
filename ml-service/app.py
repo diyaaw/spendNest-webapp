@@ -26,6 +26,9 @@ from app.services.analytics_service import (
     get_category_breakdown,
     get_monthly_analytics,
     get_summary,
+    get_anomaly_flags,
+    get_spending_trends,
+    generate_insights,
 )
 from app.services.forecast_service import get_income_forecast
 from app.services.recommendation_service import get_recommendations
@@ -197,6 +200,11 @@ def parse_and_analyze():
     summary            = get_summary(df)
     monthly_analytics  = get_monthly_analytics(df)
     category_breakdown = get_category_breakdown(df)
+    
+    # New Intelligence Features
+    df = get_anomaly_flags(df)
+    trends = get_spending_trends(df)
+    insights = generate_insights(summary, trends, monthly_analytics)
 
     # ── 7. Forecast + Recommendation ─────────────────────────────────────────
     try:
@@ -271,6 +279,8 @@ def parse_and_analyze():
         "summary":            _safe_json(summary),
         "forecast":           _safe_json(forecast),
         "recommendation":     _safe_json(recommendation),
+        "trends":             _safe_json(trends),
+        "insights":           _safe_json(insights),
     }
 
     return jsonify(response_payload), 200

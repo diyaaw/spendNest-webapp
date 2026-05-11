@@ -33,6 +33,16 @@ const healthSchema = new mongoose.Schema(
       type: Number,
       default: 6,
     },
+    // AI-generated natural language summaries
+    insights: {
+      type: [String],
+      default: [],
+    },
+    // Spending patterns (weekend vs weekday, etc.)
+    trends: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   { timestamps: true }
 );

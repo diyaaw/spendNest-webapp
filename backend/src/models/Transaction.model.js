@@ -62,6 +62,11 @@ const transactionSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    bank: {
+      type: String,
+      default: 'Main Account',
+      trim: true,
+    },
   },
   {
     // Only createdAt — transactions are immutable once written

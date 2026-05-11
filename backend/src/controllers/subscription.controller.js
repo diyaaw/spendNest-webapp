@@ -228,7 +228,7 @@ const detectSubscriptions = async (req, res, next) => {
       const doc = await Subscription.findOneAndUpdate(
         { userId, normalizedName: normName },
         { $set: payload },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
       upserted.push(doc);
     }

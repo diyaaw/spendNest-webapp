@@ -4,6 +4,8 @@ const { parseAndAnalyze } = require('../services/ml.service');
 const Transaction = require('../models/Transaction.model');
 const Ledger      = require('../models/Ledger.model');
 const Forecast    = require('../models/Forecast.model');
+const FinancialHealth = require('../models/FinancialHealth.model');
+const AuditLog        = require('../models/AuditLog.model');
 const { UploadStore } = require('../services/sharedStore');
 
 const isDbConnected = () => mongoose.connection.readyState === 1;
@@ -76,6 +78,8 @@ const uploadCsv = async (req, res, next) => {
       type = amount > 0 ? 'income' : amount < 0 ? 'expense' : 'transfer';
     }
 
+    const bank = req.body.bankName || 'Main Account';
+
     return {
       userId,
       date:        tx.date ? new Date(tx.date) : new Date(),
@@ -87,6 +91,7 @@ const uploadCsv = async (req, res, next) => {
       source:      'csv_upload',
       uploadBatch: uploadId,
       isAnomaly:   tx.is_anomaly   ?? false,
+      bank,
     };
   });
 
@@ -133,6 +138,29 @@ const uploadCsv = async (req, res, next) => {
         generatedAt: new Date(),
         model: (fc.model_used || 'SMA').includes('ARIMA') ? 'ARIMA' : 'SMA',
         predictions,
+      });
+      
+      // d) Financial Health (Insights & Trends)
+      await FinancialHealth.findOneAndUpdate(
+        { userId },
+        { 
+          $set: { 
+            insights: mlResult.insights || [],
+            trends:   mlResult.trends   || {},
+          }
+        },
+        { upsert: true, returnDocument: 'after' }
+      );
+
+      // e) Audit Log
+      await AuditLog.create({
+        userId,
+        action: 'csv_upload',
+        metadata: {
+          filename: req.file.originalname,
+          rowCount: txDocs.length,
+          uploadBatch: uploadId,
+        },
       });
 
       console.log(`✅ [Upload] Persisted to MongoDB (batch: ${uploadId})`);
