@@ -1,0 +1,22 @@
+date,description,amount,balance
+2026-05-01,Opening Balance,0.00,5000.00
+2026-05-02,Company Salary Inc,3500.00,8500.00
+2026-05-03,Swiggy Order #1234,-45.50,8454.50
+2026-05-05,Amazon Retail,-120.00,8334.50
+2026-05-06,Uber Ride to Office,-15.00,8319.50
+2026-05-08,Netflix Monthly,-12.99,8306.51
+2026-05-10,UPI Transfer to Friend,-50.00,8256.51
+2026-05-12,Electricity Board,-85.00,8171.51
+2026-05-15,Starbucks Coffee,-6.50,8165.01
+2026-05-18,Apollo Pharmacy,-25.00,8140.01
+2026-05-20,MakeMyTrip Flight Booking,-250.00,7890.01
+2026-05-25,Zomato Delivery,-30.00,7860.01
+2026-05-28,Jio Mobile Recharge,-10.00,7850.01
+2026-05-30,Salary Inc,3500.00,11350.01
+2026-06-02,Swiggy Food,-40.00,11310.01
+2026-06-05,Amazon Electronics,-200.00,11110.01
+2026-06-08,Netflix Subscription,-12.99,11097.02
+2026-06-12,Water Bill,-30.00,11067.02
+2026-06-15,Ola Ride,-18.00,11049.02
+2026-06-20,Coursera Course,-49.00,11000.02
+2026-06-30,Salary Inc,3500.00,14500.02
