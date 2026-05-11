@@ -149,10 +149,32 @@ const getForecast = async (req, res, next) => {
     if (isDbConnected()) {
       const forecast = await Forecast.findOne({ userId }).sort({ generatedAt: -1 });
       if (forecast) {
+        let historicalIncome = forecast.historicalIncome || [];
+        
+        // Fallback: If historicalIncome is missing (old record), derive it from transactions
+        if (historicalIncome.length === 0) {
+          const transactions = await Transaction.find({ 
+            userId, 
+            type: 'income',
+            category: { $ne: 'transfer' }
+          }).sort({ date: 1 });
+
+          const monthMap = {};
+          transactions.forEach(t => {
+            const key = new Date(t.date).toLocaleString('en-US', { month: 'short', year: 'numeric' });
+            monthMap[key] = (monthMap[key] || 0) + t.amount;
+          });
+          historicalIncome = Object.entries(monthMap).map(([month, income]) => ({ month, income }));
+        }
+
         return res.json({
-          model:       forecast.model,
-          generatedAt: forecast.generatedAt,
-          predictions: forecast.predictions,
+          model:                forecast.model,
+          generatedAt:          forecast.generatedAt,
+          predictions:          forecast.predictions,
+          historicalIncome:     historicalIncome,
+          volatility:           forecast.volatility || { score: 0, fluctuationPct: 0, stabilityScore: 100, variance: 0 },
+          bufferRecommendation: forecast.bufferRecommendation || { emergencySavingsPct: 20, taxReservePct: 15 },
+          insights:             forecast.insights || [],
         });
       }
     }
@@ -170,9 +192,21 @@ const getForecast = async (req, res, next) => {
         });
       }
       return res.json({
-        model: fc.model_used || 'SMA',
-        generatedAt: new Date(),
-        predictions
+        model:                fc.model_used || 'WMA',
+        generatedAt:          new Date(),
+        predictions:          predictions,
+        historicalIncome:     fc.historical_income || [],
+        volatility: {
+          score:              fc.volatility?.score || 0,
+          fluctuationPct:     fc.volatility?.fluctuation_pct || 0,
+          stabilityScore:     fc.volatility?.stability_score || 0,
+          variance:           fc.volatility?.variance || 0
+        },
+        bufferRecommendation: {
+          emergencySavingsPct: fc.buffer_recommendation?.emergency_savings_pct || 20,
+          taxReservePct:       fc.buffer_recommendation?.tax_reserve_pct || 15
+        },
+        insights:             fc.insights || []
       });
     }
 

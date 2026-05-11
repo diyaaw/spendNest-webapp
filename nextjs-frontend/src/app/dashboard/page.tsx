@@ -172,7 +172,7 @@ function DashboardContent() {
           <MonthlyChart data={monthlyData} />
         </div>
         <div className="lg:col-span-1">
-          <InsightsCard summary={summary} categories={categoryData} />
+          <InsightsCard summary={summary} categories={categoryData} forecastInsights={forecast?.insights} />
         </div>
       </div>
 

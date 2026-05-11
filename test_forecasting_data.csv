@@ -1,0 +1,24 @@
+date,description,amount,balance
+2026-03-01,Opening Balance,0.00,10000.00
+2026-03-05,Freelance Project Payout,5000.00,15000.00
+2026-03-10,Amazon Shopping,-150.00,14850.00
+2026-03-15,Starbucks Coffee,-6.50,14843.50
+2026-03-25,Zomato Food,-30.00,14813.50
+2026-03-30,Salary Credit,5000.00,19813.50
+2026-04-02,Uber Ride,-15.00,19798.50
+2026-04-05,Minimal Freelance Work,1000.00,20798.50
+2026-04-10,Netflix Subscription,-12.99,20785.51
+2026-04-15,Swiggy Dinner,-25.00,20760.51
+2026-04-20,Phone Bill,-40.00,20720.51
+2026-04-30,Salary Credit,5000.00,25720.51
+2026-05-01,Big Client Bonus,8000.00,33720.51
+2026-05-05,Freelance Project,-3000.00,30720.51
+2026-05-10,Amazon Electronics,-500.00,30220.51
+2026-05-15,UPI Transfer to Self,2000.00,32220.51
+2026-05-25,Dining Out,-100.00,32120.51
+2026-05-30,Salary Credit,5000.00,37120.51
+2026-06-05,Regular Project Payout,5500.00,42620.51
+2026-06-10,Internet Bill,-50.00,42570.51
+2026-06-15,Coffee,-5.00,42565.51
+2026-06-20,Shopping,-200.00,42365.51
+2026-06-30,Salary Credit,5000.00,47365.51

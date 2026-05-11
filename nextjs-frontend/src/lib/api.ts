@@ -115,6 +115,11 @@ const normalizeForecast = (raw: any): any => {
     predicted_income: pred.predictedIncome ?? pred.predicted_income ?? 0,
     predicted_month: pred.month ?? pred.predicted_month ?? 'Next Month',
     model_used: raw.model ?? raw.model_used ?? 'SMA',
+    historical_income: raw.historicalIncome ?? raw.historical_income ?? [],
+    smoothed_income: raw.smoothed_income ?? [],
+    volatility: raw.volatility ?? { score: 0, fluctuationPct: 0, stabilityScore: 0, variance: 0 },
+    bufferRecommendation: raw.bufferRecommendation ?? { emergencySavingsPct: 20, taxReservePct: 15 },
+    insights: raw.insights ?? [],
     recommendedSaveRate: pred.recommendedSaveRate ?? 0.10,
   };
 };

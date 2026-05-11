@@ -136,8 +136,20 @@ const uploadCsv = async (req, res, next) => {
       await Forecast.create({
         userId,
         generatedAt: new Date(),
-        model: (fc.model_used || 'SMA').includes('ARIMA') ? 'ARIMA' : 'SMA',
+        model: fc.model_used || 'WMA',
         predictions,
+        historicalIncome: fc.historical_income || [],
+        volatility: {
+          score: fc.volatility?.score || 0,
+          fluctuationPct: fc.volatility?.fluctuation_pct || 0,
+          stabilityScore: fc.volatility?.stability_score || 0,
+          variance: fc.volatility?.variance || 0
+        },
+        bufferRecommendation: {
+          emergencySavingsPct: fc.buffer_recommendation?.emergency_savings_pct || 20,
+          taxReservePct: fc.buffer_recommendation?.tax_reserve_pct || 15
+        },
+        insights: fc.insights || []
       });
       
       // d) Financial Health (Insights & Trends)

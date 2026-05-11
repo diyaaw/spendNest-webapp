@@ -45,14 +45,33 @@ const forecastSchema = new mongoose.Schema(
     // ML model used to generate this forecast
     model: {
       type: String,
-      enum: ['ARIMA', 'SMA'],
-      default: 'SMA',
+      default: 'WMA',
     },
     // Embedded array of future month predictions
     predictions: {
       type: [predictionSchema],
       default: [],
     },
+    // Data points from the past used to generate the forecast
+    historicalIncome: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+    // NEW: Analytics & Volatility
+    volatility: {
+      score: { type: Number, default: 0 },
+      fluctuationPct: { type: Number, default: 0 },
+      stabilityScore: { type: Number, default: 0 },
+      variance: { type: Number, default: 0 }
+    },
+    bufferRecommendation: {
+      emergencySavingsPct: { type: Number, default: 20 },
+      taxReservePct: { type: Number, default: 15 }
+    },
+    insights: {
+      type: [String],
+      default: []
+    }
   },
   { timestamps: false } // generatedAt is the only timestamp needed
 );

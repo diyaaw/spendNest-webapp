@@ -29,9 +29,21 @@ export interface HistoricalIncome {
 
 export interface Forecast {
   historical_income: HistoricalIncome[];
+  smoothed_income?: { month: string; value: number }[];
   predicted_month: string;
   predicted_income: number;
   model_used: string;
+  volatility?: {
+    score: number;
+    fluctuationPct: number;
+    stabilityScore: number;
+    variance: number;
+  };
+  bufferRecommendation?: {
+    emergencySavingsPct: number;
+    taxReservePct: number;
+  };
+  insights?: string[];
 }
 
 export interface Recommendation {

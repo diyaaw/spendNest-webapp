@@ -229,12 +229,12 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
 
     # ── Step 2: DATE ─────────────────────────────────────────────────────────
     if date_col:
-        # Try multiple formats if standard coercion fails
-        dates = pd.to_datetime(df[date_col], errors="coerce", dayfirst=True)
+        # Try standard parsing first (letting pandas infer ISO vs other)
+        dates = pd.to_datetime(df[date_col], errors="coerce")
         
-        # If more than 50% failed to parse, try without dayfirst
+        # If too many failures, try with dayfirst=True for DD-MM formats
         if dates.isna().sum() > (len(dates) / 2):
-            dates = pd.to_datetime(df[date_col], errors="coerce", dayfirst=False)
+            dates = pd.to_datetime(df[date_col], errors="coerce", dayfirst=True)
             
         out["date"] = dates
     else:
