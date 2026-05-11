@@ -1,4 +1,4 @@
-# SpendNest (FlowShield) 🛡️
+# SpendNest 
 
 SpendNest is an intelligent, full-stack financial intelligence platform. It transforms raw bank statement CSVs into a beautifully visualized, actionable dashboard, helping users master their finances through AI-driven insights and predictive forecasting.
 
