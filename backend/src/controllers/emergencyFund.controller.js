@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction.model');
 const EmergencyFund = require('../models/EmergencyFund.model');
 
-const isDbConnected = () => mongoose.connection.readyState === 1;
+const { isDbConnected } = require('../config/db');  // shared singleton � never define locally
 
 // ── Risk classification ───────────────────────────────────────────────────────
 

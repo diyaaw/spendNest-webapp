@@ -1,11 +1,10 @@
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User.model');
 const { UserStore } = require('../services/sharedStore');
 
 // Helper to check if DB is connected
-const isDbConnected = () => mongoose.connection.readyState === 1;
+const { isDbConnected } = require('../config/db');  // shared singleton — never define locally
 
 // Helper to sign a JWT
 const signToken = (id) =>

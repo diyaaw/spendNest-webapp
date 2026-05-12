@@ -1,7 +1,8 @@
-const Budget = require('../models/Budget.model');
+const Budget      = require('../models/Budget.model');
 const Transaction = require('../models/Transaction.model');
-const AuditLog = require('../models/AuditLog.model');
-const mongoose = require('mongoose');
+const AuditLog    = require('../models/AuditLog.model');
+const mongoose    = require('mongoose');
+const { isDbConnected } = require('../config/db');  // shared singleton — never define locally
 
 const getBudgets = async (req, res, next) => {
   try {

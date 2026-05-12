@@ -1,0 +1,18 @@
+{
+  "watch":  ["src"],
+  "ext":    "js,json",
+  "ignore": [
+    "src/**/*.test.js",
+    "src/**/*.spec.js",
+    "*.csv",
+    "*.log",
+    "uploads/**",
+    "tmp/**",
+    "node_modules/**"
+  ],
+  "delay":  "1000",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "signal": "SIGTERM"
+}

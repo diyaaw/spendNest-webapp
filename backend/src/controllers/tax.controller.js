@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction.model');
 
-const isDbConnected = () => mongoose.connection.readyState === 1;
+const { isDbConnected } = require('../config/db');  // shared singleton � never define locally
 
 // ── Indian Tax Slabs (FY 2024-25) ────────────────────────────────────────────
 

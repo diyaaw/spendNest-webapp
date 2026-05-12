@@ -1,33 +1,27 @@
-// ⚠️  dotenv MUST be the very first import — before anything else reads process.env
+/**
+ * server.js — SpendNest Express Entry Point
+ * ───────────────────────────────────────────
+ * dotenv MUST be imported first — before any module reads process.env.
+ */
 require('dotenv').config();
 
-const app = require('./app');
+const app      = require('./app');
 const connectDB = require('./config/db');
 
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
-  // 1. Connect to MongoDB before accepting any HTTP requests
+  // 1. Establish MongoDB connection before accepting HTTP traffic.
+  //    connectDB() is idempotent — safe to call multiple times (nodemon hot-reloads).
+  //    Graceful shutdown (SIGINT/SIGTERM) is handled entirely inside db.js.
   await connectDB();
 
-  // 2. Start Express
-  const server = app.listen(PORT, () => {
-    console.log(`🚀 FlowShield API running on http://localhost:${PORT}`);
-    console.log(`   MODE: ${process.env.NODE_ENV || 'development'}`);
+  // 2. Start Express HTTP server
+  app.listen(PORT, () => {
+    console.log(`\n🚀 SpendNest API   →  http://localhost:${PORT}`);
+    console.log(`   Mode            :  ${process.env.NODE_ENV || 'development'}`);
+    console.log(`   ML Service      →  ${process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000'}`);
   });
-
-  // 3. Graceful shutdown — close DB connection cleanly on process termination
-  const shutdown = () => {
-    console.log('\n🛑 Shutting down server...');
-    server.close(() => {
-      console.log('   HTTP server closed.');
-      process.exit(0);
-    });
-  };
-
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
 };
 
 startServer();
-

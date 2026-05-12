@@ -1,14 +1,13 @@
-const mongoose = require('mongoose');
 const crypto = require('crypto');
 const { parseAndAnalyze } = require('../services/ml.service');
-const Transaction = require('../models/Transaction.model');
-const Ledger      = require('../models/Ledger.model');
-const Forecast    = require('../models/Forecast.model');
+const Transaction  = require('../models/Transaction.model');
+const Ledger       = require('../models/Ledger.model');
+const Forecast     = require('../models/Forecast.model');
 const FinancialHealth = require('../models/FinancialHealth.model');
 const AuditLog        = require('../models/AuditLog.model');
 const { UploadStore } = require('../services/sharedStore');
 
-const isDbConnected = () => mongoose.connection.readyState === 1;
+const { isDbConnected } = require('../config/db');  // shared singleton � never define locally
 
 // Allowed type values in Transaction model enum
 const VALID_TYPES = new Set(['income', 'expense', 'transfer', 'refund', 'unknown']);
@@ -29,7 +28,7 @@ const uploadCsv = async (req, res, next) => {
 
   console.log(`📁 [Upload] File received: '${req.file.originalname}' (${req.file.size} bytes)`);
 
-  const userId   = req.user.id || req.user._id; // handle both models
+  const userId   = req.user.id || req.user._id;
   const uploadId = crypto.randomUUID();
 
   // ── 2. Forward CSV to Flask ML service ────────────────────────────────────
@@ -63,7 +62,7 @@ const uploadCsv = async (req, res, next) => {
     });
   }
 
-  // ── 4. Prepare data for persistence ────────────────────────────────────────
+  // ── 4. Prepare transaction documents ──────────────────────────────────────
   const txDocs = mlResult.transactions.map((tx) => {
     let amount = 0;
     if (typeof tx.amount === 'number' && !isNaN(tx.amount)) {
@@ -73,9 +72,18 @@ const uploadCsv = async (req, res, next) => {
       if (!isNaN(parsed)) amount = parsed;
     }
 
+    // Determine type from ML classification
     let type = VALID_TYPES.has(tx.type) ? tx.type : 'unknown';
     if (type === 'unknown') {
       type = amount > 0 ? 'income' : amount < 0 ? 'expense' : 'transfer';
+    }
+
+    // Income sign-correction: if description suggests income but amount is negative
+    const INCOME_HINTS = ['salary', 'payroll', 'bonus', 'stipend', 'interest', 'freelance', 'refund', 'income'];
+    const desc = (tx.description || '').toLowerCase();
+    if (amount < 0 && INCOME_HINTS.some((hint) => desc.includes(hint))) {
+      amount = Math.abs(amount);
+      type = 'income';
     }
 
     const bank = req.body.bankName || 'Main Account';
@@ -85,78 +93,84 @@ const uploadCsv = async (req, res, next) => {
       date:        tx.date ? new Date(tx.date) : new Date(),
       description: tx.description || '',
       amount,
+      balance:     typeof tx.balance === 'number' ? tx.balance : 0,
       type,
-      category:    tx.category || 'Uncategorized',
-      isRecurring: tx.is_recurring  ?? false,
+      category:    tx.category || 'other',
+      isRecurring: tx.is_likely_recurring ?? tx.is_recurring ?? false,
+      isAnomaly:   tx.is_anomaly   ?? false,
       source:      'csv_upload',
       uploadBatch: uploadId,
-      isAnomaly:   tx.is_anomaly   ?? false,
       bank,
     };
   });
 
-  const rec  = mlResult.recommendation || {};
-  const summ = mlResult.summary        || {};
-  const fc   = mlResult.forecast        || {};
+  const rec   = mlResult.recommendation   || {};
+  const summ  = mlResult.summary          || {};
+  const fc    = mlResult.forecast         || {};
+  const subs  = mlResult.subscriptions    || [];
+  const efund = mlResult.emergency_fund   || {};
 
   // ── 5. Persist (MongoDB vs In-Memory) ──────────────────────────────────────
   if (isDbConnected()) {
     try {
-      // a) Transactions
+      // a) Transactions — batch insert
       await Transaction.insertMany(txDocs);
 
-      // b) Ledger
+      // b) Ledger — upsert current month
       const now   = new Date();
       const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       await Ledger.findOneAndUpdate(
         { userId, month },
         {
           $set: {
-            totalIncome:          Number(summ.total_income)                   || 0,
-            totalExpenses:        Number(summ.total_expenses)                 || 0,
-            availableToSpend:     Number(rec.safe_to_spend)                   || 0,
-            quarantinedForTaxes:  Number(rec.reserved_funds)                  || 0,
-            emergencyBuffer:      Number(rec.emergency_buffer)                || 0,
-            saveRate:             Math.min(1, Math.max(0,
-                                    Number(rec.recommended_reserve_rate) || 0.10)),
+            totalIncome:         Number(summ.total_income)                || 0,
+            totalExpenses:       Number(summ.total_expenses)              || 0,
+            availableToSpend:    Number(rec.safe_to_spend)                || 0,
+            quarantinedForTaxes: Number(rec.reserved_funds)               || 0,
+            emergencyBuffer:     Number(rec.emergency_buffer)             || 0,
+            monthlyBurn:         Number(rec.monthly_burn)                 || 0,
+            saveRate: Math.min(1, Math.max(0,
+              Number(rec.recommended_reserve_rate) || 0.10)),
           },
         },
         { upsert: true }
       );
 
-      // c) Forecast
+      // c) Forecast — create a new document
       const predictions = [];
-      if (fc.predicted_month) {
+      if (fc.predicted_month && fc.predicted_month !== 'Insufficient Data') {
         predictions.push({
           month:               fc.predicted_month,
-          predictedIncome:     Number(fc.predicted_income)   || 0,
+          predictedIncome:     Number(fc.predicted_income) || 0,
           recommendedSaveRate: Number(rec.recommended_reserve_rate) || 0.10,
         });
       }
       await Forecast.create({
         userId,
         generatedAt: new Date(),
-        model: fc.model_used || 'WMA',
+        model:        fc.model_used        || 'WMA',
         predictions,
-        historicalIncome: fc.historical_income || [],
+        historicalIncome:  fc.historical_income  || [],
+        stagesAvailable:   fc.stages_available   || 0,
+        isExpenseForecast: fc.is_expense_forecast || false,
         volatility: {
-          score: fc.volatility?.score || 0,
+          score:          fc.volatility?.score           || 0,
           fluctuationPct: fc.volatility?.fluctuation_pct || 0,
           stabilityScore: fc.volatility?.stability_score || 0,
-          variance: fc.volatility?.variance || 0
+          variance:       fc.volatility?.variance        || 0,
         },
         bufferRecommendation: {
           emergencySavingsPct: fc.buffer_recommendation?.emergency_savings_pct || 20,
-          taxReservePct: fc.buffer_recommendation?.tax_reserve_pct || 15
+          taxReservePct:       fc.buffer_recommendation?.tax_reserve_pct       || 15,
         },
-        insights: fc.insights || []
+        insights: fc.insights || [],
       });
-      
-      // d) Financial Health (Insights & Trends)
+
+      // d) Financial Health
       await FinancialHealth.findOneAndUpdate(
         { userId },
-        { 
-          $set: { 
+        {
+          $set: {
             insights: mlResult.insights || [],
             trends:   mlResult.trends   || {},
           }
@@ -169,8 +183,8 @@ const uploadCsv = async (req, res, next) => {
         userId,
         action: 'csv_upload',
         metadata: {
-          filename: req.file.originalname,
-          rowCount: txDocs.length,
+          filename:    req.file.originalname,
+          rowCount:    txDocs.length,
           uploadBatch: uploadId,
         },
       });
@@ -178,13 +192,34 @@ const uploadCsv = async (req, res, next) => {
       console.log(`✅ [Upload] Persisted to MongoDB (batch: ${uploadId})`);
     } catch (err) {
       console.error('❌ [Upload] MongoDB persistence failed:', err.message);
-      // Fallback if insertion fails due to validation (like ObjectId cast)
       console.warn('⚠️ Falling back to In-Memory store for this upload...');
-      await UploadStore.create({ userId, uploadId, txDocs, summary: summ, recommendation: rec, forecast: fc });
+      await UploadStore.create({
+        userId, uploadId, txDocs,
+        summary: summ,
+        recommendation: rec,
+        forecast: fc,
+        subscriptions: subs,
+        emergency_fund: efund,
+        insights: mlResult.insights || [],
+        trends: mlResult.trends || {},
+        monthlyAnalytics: mlResult.monthly_analytics || [],
+        currentMonth: mlResult.current_month || {},
+      });
     }
   } else {
-    // In-Memory Mode
-    await UploadStore.create({ userId, uploadId, txDocs, summary: summ, recommendation: rec, forecast: fc });
+    // In-Memory Mode — store everything the ML service returned
+    await UploadStore.create({
+      userId, uploadId, txDocs,
+      summary: summ,
+      recommendation: rec,
+      forecast: fc,
+      subscriptions: subs,
+      emergency_fund: efund,
+      insights: mlResult.insights || [],
+      trends: mlResult.trends || {},
+      monthlyAnalytics: mlResult.monthly_analytics || [],
+      currentMonth: mlResult.current_month || {},
+    });
     console.log(`✅ [Upload] Persisted to In-Memory store (batch: ${uploadId})`);
   }
 

@@ -1,13 +1,20 @@
 /**
  * sharedStore.js
  * ──────────────
- * A thread-safe (within the event loop) in-memory data store for the FlowShield
- * platform. This acts as a secondary storage layer to ensure the dashboard
- * works even if MongoDB is unreachable or running in "In-Memory" mode.
+ * A thread-safe (within the event loop) in-memory data store for SpendNest.
+ * This acts as a secondary storage layer to ensure the dashboard works even
+ * if MongoDB is unreachable or running in "In-Memory" mode.
  *
  * DATA PERSISTENCE:
  * - This data is NOT persistent across server restarts.
  * - Used as a fallback for: Users, Uploads, and Analytics.
+ *
+ * Upload record shape:
+ * {
+ *   _id, userId, uploadId, txDocs, summary, recommendation, forecast,
+ *   subscriptions, emergency_fund, insights, trends,
+ *   monthlyAnalytics, currentMonth, createdAt
+ * }
  */
 
 const storage = {
@@ -61,8 +68,8 @@ const UploadStore = {
       .sort((a, b) => b.createdAt - a.createdAt);
   },
 
-  findById: async (id) => {
-    return storage.uploads.find(u => String(u._id) === String(id));
+  findByUploadId: async (uploadId) => {
+    return storage.uploads.find(u => String(u.uploadId) === String(uploadId)) || null;
   }
 };
 
