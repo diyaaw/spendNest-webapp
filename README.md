@@ -1,30 +1,28 @@
 # SpendNest 
 
-SpendNest is an intelligent, full-stack financial intelligence platform. It transforms raw bank statement CSVs into a beautifully visualized, actionable dashboard, helping users master their finances through AI-driven insights and predictive forecasting.
+SpendNest is an intelligent, full-stack financial intelligence platform designed for freelancers and independent contractors. It transforms raw bank statement CSVs into a beautifully visualized, actionable dashboard, helping users master their finances through AI-driven insights, predictive forecasting, and a premium "white-base" SaaS aesthetic.
 
 ---
 
-## 🚀 What's New? (V2.0)
-We've recently upgraded SpendNest into an intelligent platform with the following **AI-Powered Features**:
+## 🚀 What's New? (V2.5)
+We've recently upgraded SpendNest into an elite financial co-pilot with the following **Premium Features**:
+
+### 🎨 Premium "White-Base" UI Overhaul
+- **Elite SaaS Aesthetic**: Transitioned the entire dashboard and onboarding flow to a sophisticated light-mode theme (Slate & Indigo).
+- **Glassmorphism & Micro-animations**: Implemented tactile hover states, staggered animations, and a responsive, non-scrolling dashboard shell for a professional app feel.
+- **Improved Readability**: Focused on high-contrast typography and clean spacing to reduce financial anxiety.
+
+### 🔄 Unified Onboarding Experience
+- **Seamless Flow**: Account creation is now directly integrated with the financial profiling wizard.
+- **Zero Redundancy**: Intelligent profile setup that remembers your registration details, getting you to your dashboard in under 2 minutes.
+
+### 🇮🇳 India-First Tax Engine
+- **Automated Tax Reserves**: Automatically calculates GST and Income Tax liabilities based on current Indian tax regimes (Old vs New).
+- **Smart Reminders**: Integrated alerts for advance tax deadlines and GST filing dates.
 
 ### 🤖 AI Financial Advisor (Chat)
-- A context-aware chatbot that answers questions like *"Can I afford a ₹15,000 expense?"* based on your actual "Safe to Spend" data.
-- Answers questions about your financial health, spending history, and savings goals.
-
-### ⚠️ Anomaly Detection
-- Automatically flags unusual or suspiciously high transactions (e.g., spending 3x your category average).
-- Visual warning badges in your activity list help catch overspending early.
-
-### 📊 Intelligent Budgeting
-- Set monthly limits per category and track your progress in real-time.
-- Visual warnings when you approach or exceed your target limits.
-
-### ✨ Natural Language Insights
-- Plain-English summaries of your financial patterns: *"You spend 40% more on weekends"* or *"Your food expenses have risen 3 months in a row"*.
-
-### 🏦 Multi-Account Support
-- Upload CSVs from different banks and tag them by account (HDFC, ICICI, etc.).
-- Merges all data into one unified view while maintaining source traceability.
+- **Context-Aware Insights**: A chatbot that answers questions like *"Can I afford a ₹15,000 expense?"* based on your actual "Safe to Spend" data.
+- **Anomaly Detection**: Automatically flags unusual or suspiciously high transactions.
 
 ---
 
@@ -32,15 +30,15 @@ We've recently upgraded SpendNest into an intelligent platform with the followin
 - **Smart CSV Parsing:** Normalizes varied, unstructured bank statement formats into a standardized schema.
 - **Auto-Categorization:** Uses keyword-matching to instantly classify transactions (Food, Travel, Salary, etc.).
 - **Financial Health Score:** A 0–100 score based on savings rate, spending consistency, and emergency runway.
-- **Predictive Forecasting:** Uses ARIMA/SMA models to predict upcoming income trends.
-- **Tax Estimator:** Calculates potential tax obligations based on the latest Indian tax regimes.
+- **Predictive Forecasting:** Uses ML models to predict upcoming income trends and cash-flow gaps.
+- **Safety Net Planning:** Built-in emergency fund tracker and income smoothing suggestions.
 
 ---
 
 ## 🛠️ Tech Stack
 - **Frontend:** Next.js 14 (App Router), Tailwind CSS, Framer Motion, Recharts.
-- **Backend (API):** Node.js, Express, MongoDB (Mongoose).
-- **ML Microservice:** Flask, Pandas, NumPy, Statsmodels.
+- **Backend (API):** Node.js, Express, MongoDB.
+- **ML Microservice:** Python (Flask/FastAPI), Pandas, NumPy, Statsmodels.
 - **State Management:** Zustand.
 
 ---
@@ -52,7 +50,7 @@ We've recently upgraded SpendNest into an intelligent platform with the followin
 - Python 3.10+
 - MongoDB (Atlas or Local)
 
-### 2. Setup the ML Service (FastAPI/Flask)
+### 2. Setup the ML Service
 ```bash
 cd ml-service
 python -m venv venv
@@ -62,7 +60,7 @@ python app.py
 ```
 *Runs on http://localhost:8000*
 
-### 3. Setup the Backend API (Express)
+### 3. Setup the Backend API
 ```bash
 cd backend
 npm install
@@ -71,7 +69,7 @@ npm run dev
 ```
 *Runs on http://localhost:5000*
 
-### 4. Setup the Frontend (Next.js)
+### 4. Setup the Frontend
 ```bash
 cd nextjs-frontend
 npm install
@@ -81,13 +79,5 @@ npm run dev
 
 ---
 
-## 🧪 Testing the AI
-After uploading a bank statement, click the **Robot Icon** in the bottom-right corner to talk to your financial advisor. You can ask:
-- *"What is my financial health score?"*
-- *"Can I afford a ₹5,000 shopping trip?"*
-- *"How much did I spend on Food this month?"*
-
----
-
 ## 🛡️ Audit & Transparency
-SpendNest maintains a full **Audit Trail** of every upload and budget change, ensuring your financial data history is secure and traceable.
+SpendNest maintains a full **Audit Trail** of every upload and budget change, ensuring your financial data history is secure and traceable. All processing is done securely with SOC 2 compliance standards in mind.
