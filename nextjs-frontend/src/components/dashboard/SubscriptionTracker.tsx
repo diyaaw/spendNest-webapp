@@ -8,15 +8,15 @@ const fmt = (n: number) => CURRENCY_SYMBOL + Math.round(n).toLocaleString('en-IN
 const EXPRESS = process.env.NEXT_PUBLIC_API_URL!;
 
 const CATEGORY_META: Record<string, { icon: string; color: string; bg: string }> = {
-  streaming:  { icon: '🎬', color: 'text-purple-400',  bg: 'bg-purple-500/10' },
-  saas:       { icon: '⚡', color: 'text-blue-400',    bg: 'bg-blue-500/10' },
-  cloud:      { icon: '☁️', color: 'text-sky-400',     bg: 'bg-sky-500/10' },
-  utilities:  { icon: '💡', color: 'text-yellow-400',  bg: 'bg-yellow-500/10' },
-  rent:       { icon: '🏠', color: 'text-orange-400',  bg: 'bg-orange-500/10' },
-  emi:        { icon: '🏦', color: 'text-rose-400',    bg: 'bg-rose-500/10' },
-  insurance:  { icon: '🛡️', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  fitness:    { icon: '💪', color: 'text-pink-400',    bg: 'bg-pink-500/10' },
-  other:      { icon: '📦', color: 'text-indigo-400',  bg: 'bg-indigo-500/10' },
+  streaming:  { icon: '🎬', color: 'text-purple-600',  bg: 'bg-purple-50' },
+  saas:       { icon: '⚡', color: 'text-blue-600',    bg: 'bg-blue-50' },
+  cloud:      { icon: '☁️', color: 'text-sky-600',     bg: 'bg-sky-50' },
+  utilities:  { icon: '💡', color: 'text-amber-600',   bg: 'bg-amber-50' },
+  rent:       { icon: '🏠', color: 'text-orange-600',  bg: 'bg-orange-50' },
+  emi:        { icon: '🏦', color: 'text-rose-600',    bg: 'bg-rose-50' },
+  insurance:  { icon: '🛡️', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  fitness:    { icon: '💪', color: 'text-pink-600',    bg: 'bg-pink-50' },
+  other:      { icon: '📦', color: 'text-indigo-600',  bg: 'bg-indigo-50' },
 };
 
 function daysUntil(d?: string | null) {
@@ -112,9 +112,9 @@ interface SubData {
 function SubCard({ sub, onRemove }: { sub: Sub; onRemove: (uid: string, id?: string) => void }) {
   const meta    = CATEGORY_META[sub.category] ?? CATEGORY_META.other;
   const days    = daysUntil(sub.nextBillingDate);
-  const urgency = days !== null && days <= 3 ? 'bg-rose-500/20 text-rose-400'
-    : days !== null && days <= 7             ? 'bg-amber-500/20 text-amber-400'
-    : 'bg-white/5 text-white/30';
+  const urgency = days !== null && days <= 3 ? 'bg-rose-50 text-rose-600 border border-rose-100'
+    : days !== null && days <= 7             ? 'bg-amber-50 text-amber-600 border border-amber-100'
+    : 'bg-slate-50 text-slate-400 border border-slate-100';
 
   return (
     <motion.div
@@ -122,22 +122,22 @@ function SubCard({ sub, onRemove }: { sub: Sub; onRemove: (uid: string, id?: str
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/4 hover:bg-white/7 border border-white/5 transition-all group"
+      className="flex items-center gap-3 p-3.5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-100 transition-all group shadow-sm"
     >
       <div className={`w-10 h-10 ${meta.bg} rounded-xl flex items-center justify-center text-lg flex-shrink-0`}>
         {meta.icon}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-white/85 truncate">{sub.displayName}</p>
+          <p className="text-sm font-semibold text-slate-800 truncate">{sub.displayName}</p>
           {sub.priceIncreased && (
-            <span className="text-[9px] bg-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded-full font-bold">↑ PRICE</span>
+            <span className="text-[9px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-full font-bold border border-rose-100">↑ PRICE</span>
           )}
           {sub.isConfirmed && (
-            <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-full font-bold">✓ CONFIRMED</span>
+            <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full font-bold border border-emerald-100">✓ CONFIRMED</span>
           )}
         </div>
-        <p className="text-[11px] text-white/30 capitalize mt-0.5">
+        <p className="text-[11px] text-slate-400 capitalize mt-0.5">
           {sub.frequency}
           {sub.occurrenceCount > 0 ? ` · ${sub.occurrenceCount}× detected` : ''}
         </p>
@@ -146,12 +146,12 @@ function SubCard({ sub, onRemove }: { sub: Sub; onRemove: (uid: string, id?: str
         <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${urgency}`}>In {days}d</span>
       )}
       <div className="text-right flex-shrink-0">
-        <p className="text-sm font-black text-white">{fmt(sub.amount)}</p>
-        <p className="text-[10px] text-white/25">{fmt(sub.yearlyCost)}/yr</p>
+        <p className="text-sm font-black text-slate-900">{fmt(sub.amount)}</p>
+        <p className="text-[10px] text-slate-400">{fmt(sub.yearlyCost)}/yr</p>
       </div>
       <button
         onClick={() => onRemove(sub.uid, sub._id)}
-        className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-rose-400 transition-all ml-1"
+        className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all ml-1"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -223,17 +223,17 @@ export default function SubscriptionTracker() {
   const priceIncreased = subs.filter((s) => s.priceIncreased);
 
   return (
-    <div className="bg-gradient-to-br from-slate-900 to-[#0d1117] rounded-3xl p-6 border border-white/5 shadow-xl space-y-5">
+    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Bill &amp; Subscription Tracker</h3>
-          <p className="text-white/25 text-xs mt-0.5">AI-detected from your transactions</p>
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Bill &amp; Subscription Tracker</h3>
+          <p className="text-slate-500 text-xs mt-0.5">AI-detected from your transactions</p>
         </div>
         <button
           onClick={detect}
           disabled={detecting}
-          className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all"
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-md shadow-indigo-100"
         >
           {detecting
             ? <><div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Detecting…</>
@@ -249,10 +249,10 @@ export default function SubscriptionTracker() {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white/60"
+            className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 text-xs text-indigo-700"
           >
             <span>{alert}</span>
-            <button onClick={() => setAlert(null)} className="text-white/25 hover:text-white ml-4">✕</button>
+            <button onClick={() => setAlert(null)} className="text-indigo-400 hover:text-indigo-600 ml-4">✕</button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -260,19 +260,19 @@ export default function SubscriptionTracker() {
       {/* Smart alerts */}
       <div className="space-y-2">
         {upcomingCount > 0 && (
-          <div className="flex gap-2 text-xs text-amber-400/80 bg-amber-500/5 border border-amber-500/15 rounded-xl px-3 py-2">
+          <div className="flex gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
             <span>⚠️</span>
             <span>{upcomingCount} subscription{upcomingCount > 1 ? 's' : ''} renewing within 7 days.</span>
           </div>
         )}
         {priceIncreased.length > 0 && (
-          <div className="flex gap-2 text-xs text-rose-400/80 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2">
+          <div className="flex gap-2 text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
             <span>📈</span>
             <span>Price increase detected: {priceIncreased.map((s) => s.displayName).join(', ')}.</span>
           </div>
         )}
         {totalYearly > 50000 && (
-          <div className="flex gap-2 text-xs text-white/50 bg-white/5 border border-white/8 rounded-xl px-3 py-2">
+          <div className="flex gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
             <span>💸</span>
             <span>You spend {fmt(totalYearly)} per year on subscriptions.</span>
           </div>
@@ -282,13 +282,13 @@ export default function SubscriptionTracker() {
       {/* KPI cards */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Active',   val: subs.length,          cls: 'text-white' },
-          { label: 'Monthly',  val: fmt(totalMonthly),    cls: 'text-rose-400' },
-          { label: 'Yearly',   val: fmt(totalYearly),     cls: 'text-amber-400' },
+          { label: 'Active',   val: subs.length,          cls: 'text-slate-900' },
+          { label: 'Monthly',  val: fmt(totalMonthly),    cls: 'text-rose-600' },
+          { label: 'Yearly',   val: fmt(totalYearly),     cls: 'text-indigo-600' },
         ].map((k) => (
-          <div key={k.label} className="bg-white/5 rounded-2xl p-3 text-center">
+          <div key={k.label} className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
             <p className={`text-xl font-black ${k.cls}`}>{k.val}</p>
-            <p className="text-[10px] text-white/30 mt-0.5">{k.label}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{k.label}</p>
           </div>
         ))}
       </div>
@@ -302,8 +302,8 @@ export default function SubscriptionTracker() {
               onClick={() => setActiveCategory(cat)}
               className={`text-[11px] font-semibold px-3 py-1.5 rounded-full capitalize transition-all ${
                 activeCategory === cat
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-white/5 text-white/40 hover:text-white/70'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100'
+                  : 'bg-slate-100 text-slate-500 hover:text-slate-900'
               }`}
             >
               {cat === 'all' ? 'All' : `${CATEGORY_META[cat]?.icon ?? ''} ${cat}`}
@@ -316,14 +316,14 @@ export default function SubscriptionTracker() {
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 bg-white/4 rounded-2xl animate-pulse" />
+            <div key={i} className="h-14 bg-slate-50 rounded-2xl animate-pulse" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-10">
           <p className="text-4xl mb-3">📭</p>
-          <p className="text-white/30 text-sm">No recurring subscriptions detected.</p>
-          <p className="text-white/20 text-xs mt-1">Upload your bank statement and click Detect to scan.</p>
+          <p className="text-slate-400 text-sm">No recurring subscriptions detected.</p>
+          <p className="text-slate-300 text-xs mt-1">Upload your bank statement and click Detect to scan.</p>
         </div>
       ) : (
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
@@ -338,18 +338,18 @@ export default function SubscriptionTracker() {
       {/* Upcoming renewals */}
       {upcoming.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-white/35 uppercase tracking-wider mb-2">🔔 Upcoming Renewals</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">🔔 Upcoming Renewals</p>
           <div className="space-y-1.5">
             {upcoming.map((s) => (
               <div
                 key={s.uid}
-                className="flex items-center justify-between text-xs px-3 py-2 bg-amber-500/8 border border-amber-500/15 rounded-xl"
+                className="flex items-center justify-between text-xs px-3 py-2 bg-amber-50 border border-amber-100 rounded-xl"
               >
-                <span className="text-white/60">{s.displayName}</span>
+                <span className="text-slate-600">{s.displayName}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-amber-400 font-bold">{fmt(s.amount)}</span>
+                  <span className="text-amber-700 font-bold">{fmt(s.amount)}</span>
                   {daysUntil(s.nextBillingDate) !== null && (
-                    <span className="text-white/30">in {daysUntil(s.nextBillingDate)}d</span>
+                    <span className="text-slate-400">in {daysUntil(s.nextBillingDate)}d</span>
                   )}
                 </div>
               </div>

@@ -1,10 +1,9 @@
 const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction.model');
 const EmergencyFund = require('../models/EmergencyFund.model');
+const { UploadStore, EmergencyFundStore } = require('../services/sharedStore');
 
-const { isDbConnected } = require('../config/db');  // shared singleton � never define locally
-
-// ── Risk classification ───────────────────────────────────────────────────────
+const { isDbConnected } = require('../config/db');
 
 function classifyRisk(months) {
   if (months >= 12) return { level: 'excellent', score: 100, color: '#10B981' };
@@ -14,165 +13,159 @@ function classifyRisk(months) {
   return              { level: 'critical',  score: 5,   color: '#F43F5E' };
 }
 
-// ── GET /api/emergency-fund ─────────────────────────────────────────────────
-
 const getEmergencyFund = async (req, res, next) => {
   try {
     const userId = req.user.id || req.user._id;
+    let avgMonthlyExpenses = 0;
 
-    if (!isDbConnected()) {
-      return res.status(503).json({ message: 'Database not connected.' });
+    if (isDbConnected() && mongoose.Types.ObjectId.isValid(String(userId))) {
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const result = await Transaction.aggregate([
+        { $match: { userId: new mongoose.Types.ObjectId(String(userId)), type: { $in: ['expense', 'transfer'] }, date: { $gte: sixMonthsAgo } } },
+        { $group: { _id: { year: { $year: '$date' }, month: { $month: '$date' } }, monthlyTotal: { $sum: { $abs: '$amount' } } } }
+      ]);
+      avgMonthlyExpenses = result.length > 0 ? result.reduce((s, m) => s + m.monthlyTotal, 0) / result.length : 0;
     }
 
-    // Auto-compute avg monthly expenses from last 6 months of transactions
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    if (avgMonthlyExpenses === 0) {
+      const uploads = await UploadStore.findByUserId(userId);
+      const target = uploads[0];
+      if (target && target.txDocs) {
+        const monthMap = {};
+        target.txDocs.forEach(t => {
+          if (['expense', 'transfer'].includes(t.type)) {
+            const date = new Date(t.date);
+            if (!isNaN(date.getTime())) {
+              const key = `${date.getFullYear()}-${date.getMonth()}`;
+              monthMap[key] = (monthMap[key] || 0) + Math.abs(t.amount);
+            }
+          }
+        });
+        const months = Object.values(monthMap);
+        // If we have data across multiple months, average it. 
+        // If only one month, it might be the total sum of a small period, so we divide by 1.
+        avgMonthlyExpenses = months.length > 0 ? months.reduce((a, b) => a + b, 0) / months.length : 0;
+      }
+    }
 
-    const result = await Transaction.aggregate([
-      {
-        $match: {
-          userId: new mongoose.Types.ObjectId(String(userId)),
-          type: { $in: ['expense', 'transfer'] },
-          date: { $gte: sixMonthsAgo },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            year:  { $year: '$date' },
-            month: { $month: '$date' },
-          },
-          monthlyTotal: { $sum: { $abs: '$amount' } },
-        },
-      },
-    ]);
+    let fund;
+    let isInMemory = true;
 
-    const avgMonthlyExpenses = result.length > 0
-      ? result.reduce((s, m) => s + m.monthlyTotal, 0) / result.length
-      : 0;
+    if (isDbConnected() && mongoose.Types.ObjectId.isValid(String(userId))) {
+      fund = await EmergencyFund.findOne({ userId });
+      if (fund) isInMemory = false;
+    }
 
-    // Fetch or create the fund document
-    let fund = await EmergencyFund.findOne({ userId });
     if (!fund) {
-      fund = new EmergencyFund({ userId, avgMonthlyExpenses });
+      // Try to load pre-calculated data from UploadStore
+      const uploads = await UploadStore.findByUserId(userId);
+      const latest = uploads[0];
+      const mlFund = (latest && latest.emergency_fund) ? latest.emergency_fund : {};
+      
+      // Load user settings from In-Memory store
+      const settings = await EmergencyFundStore.findByUserId(userId);
+
+      // Return a virtual object for In-Memory mode
+      fund = {
+        userId,
+        currentSavings: settings?.currentSavings || mlFund.current_savings || 0,
+        targetMonths: settings?.targetMonths || mlFund.target_months || 6,
+        avgMonthlyExpenses: avgMonthlyExpenses || mlFund.monthly_burn || 0,
+        runwayMonths: 0,
+        targetSavings: 0,
+        riskLevel: 'critical',
+        readinessScore: 0,
+        monthlyTargetToGoal: 0,
+        lastUpdated: new Date(),
+        toObject: function() { return this; },
+        save: async function() { return this; }
+      };
     } else {
-      fund.avgMonthlyExpenses = avgMonthlyExpenses || fund.avgMonthlyExpenses;
+      fund.avgMonthlyExpenses = avgMonthlyExpenses || fund.avgMonthlyExpenses || 0;
     }
 
-    // Recalculate derived fields
-    fund.runwayMonths = fund.avgMonthlyExpenses > 0
-      ? parseFloat((fund.currentSavings / fund.avgMonthlyExpenses).toFixed(1))
-      : 0;
-
-    const targetSavings = (fund.avgMonthlyExpenses * fund.targetMonths) || 0;
-    fund.targetSavings = Math.round(targetSavings);
-
+    fund.runwayMonths = fund.avgMonthlyExpenses > 0 ? parseFloat((fund.currentSavings / fund.avgMonthlyExpenses).toFixed(1)) : 0;
+    fund.targetSavings = Math.round(fund.avgMonthlyExpenses * fund.targetMonths);
     const risk = classifyRisk(fund.runwayMonths);
-    fund.riskLevel = risk.level;
-    fund.readinessScore = risk.score;
-
-    // Monthly contribution needed to reach target in 12 months
-    const gap = Math.max(0, fund.targetSavings - fund.currentSavings);
-    fund.monthlyTargetToGoal = Math.round(gap / 12);
+    fund.riskLevel = risk.level; fund.readinessScore = risk.score;
+    fund.monthlyTargetToGoal = Math.round(Math.max(0, fund.targetSavings - fund.currentSavings) / 12);
     fund.lastUpdated = new Date();
 
-    await fund.save();
+    if (!isInMemory) await fund.save();
 
     res.json({
       ...fund.toObject(),
       riskColor: risk.color,
-      progressPct: fund.targetSavings > 0
-        ? Math.min(100, parseFloat(((fund.currentSavings / fund.targetSavings) * 100).toFixed(1)))
-        : 0,
+      progressPct: fund.targetSavings > 0 ? Math.min(100, parseFloat(((fund.currentSavings / fund.targetSavings) * 100).toFixed(1))) : 0
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
-
-// ── POST /api/emergency-fund/update ─────────────────────────────────────────
 
 const updateEmergencyFund = async (req, res, next) => {
   try {
     const userId = req.user.id || req.user._id;
     const { currentSavings, targetMonths } = req.body;
-
-    let fund = await EmergencyFund.findOne({ userId });
-    if (!fund) fund = new EmergencyFund({ userId });
-
+    let fund; let isInMemory = true;
+    if (isDbConnected() && mongoose.Types.ObjectId.isValid(String(userId))) {
+      fund = await EmergencyFund.findOne({ userId });
+      if (!fund) fund = new EmergencyFund({ userId });
+      isInMemory = false;
+    }
+    if (!fund) {
+      await EmergencyFundStore.upsert(userId, {
+        currentSavings: currentSavings !== undefined ? Number(currentSavings) : undefined,
+        targetMonths: targetMonths !== undefined ? Number(targetMonths) : undefined
+      });
+      return res.json({ message: 'Emergency fund settings updated in memory.', fund: { currentSavings, targetMonths } });
+    }
     if (currentSavings !== undefined) fund.currentSavings = Math.max(0, Number(currentSavings));
-    if (targetMonths !== undefined)   fund.targetMonths   = Math.max(1, Math.min(24, Number(targetMonths)));
-
-    await fund.save();
+    if (targetMonths !== undefined) fund.targetMonths = Math.max(1, Math.min(24, Number(targetMonths)));
+    if (!isInMemory) await fund.save();
     res.json({ message: 'Emergency fund updated.', fund });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
-
-// ── GET /api/emergency-fund/analysis ─────────────────────────────────────────
 
 const getAnalysis = async (req, res, next) => {
   try {
     const userId = req.user.id || req.user._id;
-    const fund = await EmergencyFund.findOne({ userId });
+    let fund;
+    if (isDbConnected() && mongoose.Types.ObjectId.isValid(String(userId))) fund = await EmergencyFund.findOne({ userId });
     if (!fund) {
-      return res.json({ scenarios: [], recommendations: [] });
+      const settings = await EmergencyFundStore.findByUserId(userId);
+      const uploads = await UploadStore.findByUserId(userId);
+      const latest = uploads[0];
+      const mlFund = (latest && latest.emergency_fund) ? latest.emergency_fund : {};
+      
+      if (latest) {
+          fund = { 
+            avgMonthlyExpenses: mlFund.monthly_burn || 50000, 
+            currentSavings: settings?.currentSavings || 0, 
+            runwayMonths: 0, 
+            targetMonths: settings?.targetMonths || 6 
+          };
+      } else {
+          return res.json({ scenarios: [], recommendations: [] });
+      }
     }
-
-    const avg = fund.avgMonthlyExpenses || 1;
-    const savings = fund.currentSavings || 0;
-
-    // Income drop simulations
+    const avg = fund.avgMonthlyExpenses || 1; const savings = fund.currentSavings || 0;
     const scenarios = [
       { label: '20% income drop', incomeDropPct: 20 },
       { label: '40% income drop', incomeDropPct: 40 },
       { label: 'No income (layoff/dry spell)', incomeDropPct: 100 },
-      { label: 'Emergency: ₹50,000 medical', emergencyExpense: 50_000 },
-      { label: 'Emergency: ₹1,00,000 medical', emergencyExpense: 100_000 },
+      { label: 'Emergency: 50,000 medical', emergencyExpense: 50000 },
+      { label: 'Emergency: 100,000 medical', emergencyExpense: 100000 },
     ].map((s) => {
-      const remainingSavings = savings - (s.emergencyExpense || 0);
-      const newRunway = Math.max(0, remainingSavings / avg);
-      const risk = classifyRisk(newRunway);
-      return {
-        ...s,
-        remainingSavings: Math.round(Math.max(0, remainingSavings)),
-        runwayMonths: parseFloat(newRunway.toFixed(1)),
-        riskLevel: risk.level,
-        riskColor: risk.color,
-      };
+      const remainingSavings = savings - (s.emergencyExpense || 0); const newRunway = Math.max(0, remainingSavings / avg); const risk = classifyRisk(newRunway);
+      return { ...s, remainingSavings: Math.round(Math.max(0, remainingSavings)), runwayMonths: parseFloat(newRunway.toFixed(1)), riskLevel: risk.level, riskColor: risk.color };
     });
-
-    // AI recommendations
-    const recommendations = [];
-    const runway = fund.runwayMonths;
-    if (runway < 1) {
-      recommendations.push(`🔴 Critical: You have less than 1 month of runway. Prioritize building an emergency fund immediately.`);
-      recommendations.push(`Set aside ₹${(avg * 0.3).toLocaleString('en-IN', {maximumFractionDigits:0})} every month — even a 3-month cushion changes everything.`);
-    } else if (runway < 3) {
-      recommendations.push(`🟡 You have ${runway} months of runway. Target 3 months as your first milestone.`);
-      recommendations.push(`Save ₹${fund.monthlyTargetToGoal.toLocaleString('en-IN')} per month to reach ${fund.targetMonths} months coverage in 1 year.`);
-    } else if (runway < 6) {
-      recommendations.push(`🟠 You have ${runway} months of runway. Good start — push to 6 months for real security.`);
-      recommendations.push(`₹${fund.monthlyTargetToGoal.toLocaleString('en-IN')}/month will get you there in 12 months.`);
-    } else {
-      recommendations.push(`🟢 Excellent! ${runway} months runway. Your emergency fund is healthy.`);
-      recommendations.push(`Consider investing surplus savings in liquid mutual funds for better returns.`);
-    }
-
-    if (savings < 10_000) {
-      recommendations.push(`Start a dedicated savings account to separate emergency funds from daily spending.`);
-    }
-
-    res.json({
-      currentRunway: runway,
-      riskLevel: fund.riskLevel,
-      scenarios,
-      recommendations,
-    });
-  } catch (err) {
-    next(err);
-  }
+    const recommendations = []; const runway = fund.runwayMonths || 0; const monthlyTarget = fund.monthlyTargetToGoal || Math.round(avg / 12);
+    if (runway < 1) { recommendations.push('Critical: Low runway. Build fund immediately.'); }
+    else if (runway < 3) { recommendations.push('Target 3 months runway.'); }
+    else if (runway < 6) { recommendations.push('Push to 6 months runway.'); }
+    else { recommendations.push('Emergency fund is healthy.'); }
+    res.json({ currentRunway: runway, riskLevel: fund.riskLevel || 'critical', scenarios, recommendations });
+  } catch (err) { next(err); }
 };
 
 module.exports = { getEmergencyFund, updateEmergencyFund, getAnalysis };

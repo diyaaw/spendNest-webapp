@@ -34,7 +34,7 @@ const INCOME_FREQUENCIES = [
 // ── Helper components ─────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">{children}</p>;
+  return <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">{children}</p>;
 }
 
 function CurrencyInput({
@@ -45,9 +45,9 @@ function CurrencyInput({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2 block">{label}</label>
+      <label htmlFor={id} className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">{label}</label>
       <div className="relative">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 text-sm font-medium">{currencySymbol}</span>
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">{currencySymbol}</span>
         <input
           id={id}
           type="number"
@@ -55,7 +55,7 @@ function CurrencyInput({
           value={value || ''}
           onChange={(e) => onChange(Number(e.target.value))}
           placeholder={placeholder}
-          className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 hover:border-white/20 transition-all"
+          className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3.5 text-slate-900 text-sm placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 hover:border-slate-300 transition-all"
         />
       </div>
     </div>
@@ -88,16 +88,16 @@ export default function Step2WorkProfile({ onNext, onBack }: Step2Props) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-black text-white mb-1">Your work profile</h1>
-        <p className="text-white/40 text-sm">Help us tailor your income forecasts and budget targets.</p>
+        <h1 className="text-3xl font-black text-slate-900 mb-2">Work Profile</h1>
+        <p className="text-slate-500 text-sm leading-relaxed">Help us tailor your income forecasts and tax estimations.</p>
       </div>
 
       {/* Freelancer type */}
       <div>
         <SectionLabel>I am a…</SectionLabel>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {FREELANCER_TYPES.map((t) => (
             <SelectionCard
               key={t.value}
@@ -112,10 +112,10 @@ export default function Step2WorkProfile({ onNext, onBack }: Step2Props) {
         </div>
       </div>
 
-      {/* Work category */}
+      {/* Work area */}
       <div>
-        <SectionLabel>My main work area</SectionLabel>
-        <div className="grid grid-cols-4 gap-2">
+        <SectionLabel>Main Work Area</SectionLabel>
+        <div className="flex flex-wrap gap-2">
           {WORK_CATEGORIES.map((c) => (
             <motion.button
               key={c.value}
@@ -125,24 +125,24 @@ export default function Step2WorkProfile({ onNext, onBack }: Step2Props) {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               className={`
-                flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 text-center transition-all duration-200
+                flex items-center gap-2 py-2.5 px-4 rounded-xl border-2 font-bold transition-all duration-200
                 ${profile.workCategory === c.value
-                  ? 'border-indigo-500 bg-indigo-500/10 text-white'
-                  : 'border-white/10 bg-white/5 text-white/50 hover:border-white/20'}
+                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200'}
               `}
             >
-              <span className="text-xl">{c.icon}</span>
-              <span className="text-[11px] font-semibold">{c.label}</span>
+              <span className="text-lg">{c.icon}</span>
+              <span className="text-xs uppercase tracking-tight">{c.label}</span>
             </motion.button>
           ))}
         </div>
       </div>
 
-      {/* Income fields */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Income targets */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
         <CurrencyInput
           id="income-target"
-          label="Monthly Income Target"
+          label="Monthly Goal"
           value={profile.incomeTarget}
           onChange={(v) => updateProfile({ incomeTarget: v })}
           currencySymbol={currSym}
@@ -150,7 +150,7 @@ export default function Step2WorkProfile({ onNext, onBack }: Step2Props) {
         />
         <CurrencyInput
           id="avg-monthly-income"
-          label="Expected Avg. Income"
+          label="Avg. Expected"
           value={profile.avgMonthlyIncome}
           onChange={(v) => updateProfile({ avgMonthlyIncome: v })}
           currencySymbol={currSym}
@@ -160,8 +160,8 @@ export default function Step2WorkProfile({ onNext, onBack }: Step2Props) {
 
       {/* Income frequency */}
       <div>
-        <SectionLabel>How often do clients pay you?</SectionLabel>
-        <div className="flex gap-2">
+        <SectionLabel>Payment Frequency</SectionLabel>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {INCOME_FREQUENCIES.map((f) => (
             <button
               key={f.value}
@@ -169,10 +169,10 @@ export default function Step2WorkProfile({ onNext, onBack }: Step2Props) {
               type="button"
               onClick={() => updateProfile({ incomeFrequency: f.value })}
               className={`
-                flex-1 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-200
+                py-3 rounded-xl border-2 text-xs font-black uppercase tracking-widest transition-all duration-200
                 ${profile.incomeFrequency === f.value
-                  ? 'border-indigo-500 bg-indigo-500/15 text-indigo-400'
-                  : 'border-white/10 bg-white/5 text-white/40 hover:border-white/20 hover:text-white/60'}
+                  ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-100'
+                  : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'}
               `}
             >
               {f.label}
@@ -181,15 +181,22 @@ export default function Step2WorkProfile({ onNext, onBack }: Step2Props) {
         </div>
       </div>
 
-      {error && <p className="text-rose-400 text-xs bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-2">{error}</p>}
+      {error && (
+        <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 text-xs font-bold flex items-center gap-2">
+           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+           </svg>
+           {error}
+        </div>
+      )}
 
-      <div className="flex gap-3">
+      <div className="flex gap-4 pt-4">
         <button
           type="button"
           onClick={onBack}
-          className="px-5 py-3.5 rounded-xl border border-white/10 text-white/50 hover:text-white hover:border-white/25 text-sm font-medium transition-all"
+          className="px-8 py-4 rounded-2xl border-2 border-slate-100 text-slate-400 hover:text-slate-600 hover:border-slate-200 text-sm font-bold transition-all"
         >
-          ← Back
+          Back
         </button>
         <motion.button
           id="onboarding-step2-next"
@@ -197,9 +204,12 @@ export default function Step2WorkProfile({ onNext, onBack }: Step2Props) {
           onClick={handleNext}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
-          className="flex-1 py-3.5 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-indigo-900/30 text-sm"
+          className="flex-1 py-4 bg-slate-900 hover:bg-black text-white font-bold rounded-2xl transition-all duration-200 shadow-xl shadow-slate-200 text-sm flex items-center justify-center gap-2"
         >
-          Continue →
+          Save & Continue
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
         </motion.button>
       </div>
     </div>

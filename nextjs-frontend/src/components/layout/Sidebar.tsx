@@ -123,7 +123,7 @@ export default function Sidebar() {
     : '?';
 
   return (
-    <aside className="hidden md:flex flex-col w-64 min-h-screen bg-white border-r border-slate-100 shadow-sm">
+    <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 bg-white border-r border-slate-100 shadow-sm">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-100">
         <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">

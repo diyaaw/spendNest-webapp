@@ -34,15 +34,15 @@ function QuarterRow({
       transition={{ delay }}
       className={`relative flex items-center gap-4 p-4 rounded-2xl border transition-all ${
         isPast
-          ? 'border-white/5 bg-white/3 opacity-50'
+          ? 'border-slate-100 bg-slate-50 opacity-50'
           : isNext
-          ? 'border-indigo-500/30 bg-indigo-500/5'
-          : 'border-white/8 bg-white/3'
+          ? 'border-indigo-500/20 bg-indigo-50/50'
+          : 'border-slate-100 bg-slate-50'
       }`}
     >
       {/* Timeline dot */}
       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-        isPast ? 'bg-white/8 text-white/30' : 'bg-indigo-500/20 text-indigo-400'
+        isPast ? 'bg-slate-200 text-slate-400' : 'bg-indigo-100 text-indigo-600'
       }`}>
         <span className="text-xs font-bold">{percentage}%</span>
       </div>
@@ -50,18 +50,18 @@ function QuarterRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-white/80">{label}</p>
-            <p className={`text-xs ${isPast ? 'text-white/25' : 'text-indigo-400/70'}`}>Due {dueDate}</p>
+            <p className="text-sm font-semibold text-slate-700">{label}</p>
+            <p className={`text-xs ${isPast ? 'text-slate-400' : 'text-indigo-600/70'}`}>Due {dueDate}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm font-black text-white">{fmt(amountDue)}</p>
-            <p className="text-[10px] text-white/30">Cumulative {fmt(cumulative)}</p>
+            <p className="text-sm font-black text-slate-900">{fmt(amountDue)}</p>
+            <p className="text-[10px] text-slate-400">Cumulative {fmt(cumulative)}</p>
           </div>
         </div>
         {/* Progress bar */}
-        <div className="mt-2 h-1 bg-white/8 rounded-full overflow-hidden">
+        <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden">
           <motion.div
-            className={`h-full rounded-full ${isPast ? 'bg-white/20' : 'bg-indigo-500'}`}
+            className={`h-full rounded-full ${isPast ? 'bg-slate-300' : 'bg-indigo-500'}`}
             initial={{ width: 0 }}
             animate={{ width: progressWidth(cumulative, totalTax) }}
             transition={{ duration: 0.8, delay: delay + 0.1 }}
@@ -96,24 +96,24 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
   const currentDue = getCurrentAdvanceTaxDue(estimate);
 
   return (
-    <div className="bg-gradient-to-br from-slate-900 to-[#0d1117] rounded-3xl p-6 border border-white/5 shadow-xl space-y-6">
+    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Tax Estimator</h3>
-          <p className="text-white/30 text-xs mt-0.5">FY 2024-25 · Indian Freelancer</p>
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Tax Estimator</h3>
+          <p className="text-slate-500 text-xs mt-0.5">FY 2024-25 · Indian Freelancer</p>
         </div>
         {/* Regime toggle */}
-        <div className="flex rounded-xl bg-white/5 p-0.5">
+        <div className="flex rounded-xl bg-slate-100 p-0.5">
           {(['new', 'old'] as TaxRegime[]).map((r) => (
             <button
               key={r}
               onClick={() => setRegime(r)}
               className={`px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all ${
                 regime === r
-                  ? 'bg-indigo-500 text-white'
-                  : 'text-white/40 hover:text-white/70'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               {r === 'new' ? 'New Regime' : 'Old Regime'}
@@ -123,10 +123,10 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
       </div>
 
       {/* Income input */}
-      <div className="bg-white/5 rounded-2xl p-4 border border-white/8">
-        <p className="text-xs text-white/40 mb-2 font-medium">Annual Gross Income</p>
+      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+        <p className="text-xs text-slate-500 mb-2 font-medium">Annual Gross Income</p>
         <div className="flex items-center gap-3">
-          <span className="text-white/50 text-lg">₹</span>
+          <span className="text-slate-400 text-lg">₹</span>
           {isEditingIncome ? (
             <input
               type="number"
@@ -134,17 +134,17 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
               autoFocus
               onChange={(e) => setCustomIncome(Number(e.target.value))}
               onBlur={() => setIsEditingIncome(false)}
-              className="flex-1 bg-transparent text-2xl font-black text-white outline-none border-b border-indigo-500/50"
+              className="flex-1 bg-transparent text-2xl font-black text-slate-900 outline-none border-b border-indigo-500/50"
             />
           ) : (
             <button
               onClick={() => setIsEditingIncome(true)}
-              className="flex-1 text-left text-2xl font-black text-white hover:text-indigo-300 transition-colors"
+              className="flex-1 text-left text-2xl font-black text-slate-900 hover:text-indigo-600 transition-colors"
             >
-              {customIncome > 0 ? customIncome.toLocaleString('en-IN') : <span className="text-white/20">Click to enter income</span>}
+              {customIncome > 0 ? customIncome.toLocaleString('en-IN') : <span className="text-slate-300">Click to enter income</span>}
             </button>
           )}
-          <button onClick={() => setIsEditingIncome(true)} className="text-white/20 hover:text-white/50 transition-colors">
+          <button onClick={() => setIsEditingIncome(true)} className="text-slate-300 hover:text-slate-500 transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
@@ -154,17 +154,17 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
 
       {/* Hero tax numbers */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 text-center">
-          <p className="text-2xl font-black text-rose-400">{fmt(estimate.totalTax)}</p>
-          <p className="text-[10px] text-white/35 mt-1">Total Tax</p>
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-center">
+          <p className="text-2xl font-black text-indigo-600">{fmt(estimate.totalTax)}</p>
+          <p className="text-[10px] text-slate-500 mt-1">Total Tax</p>
         </div>
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-center">
-          <p className="text-2xl font-black text-amber-400">{pct(estimate.effectiveRate)}</p>
-          <p className="text-[10px] text-white/35 mt-1">Effective Rate</p>
+        <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 text-center">
+          <p className="text-2xl font-black text-violet-600">{pct(estimate.effectiveRate)}</p>
+          <p className="text-[10px] text-slate-500 mt-1">Effective Rate</p>
         </div>
-        <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-4 text-center">
-          <p className="text-2xl font-black text-indigo-400">{fmt(estimate.monthlyReserve)}</p>
-          <p className="text-[10px] text-white/35 mt-1">Reserve/Month</p>
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+          <p className="text-2xl font-black text-slate-700">{fmt(estimate.monthlyReserve)}</p>
+          <p className="text-[10px] text-slate-500 mt-1">Reserve/Month</p>
         </div>
       </div>
 
@@ -174,14 +174,14 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
           key={regime}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4"
+          className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl p-4"
         >
           <span className="text-2xl">💡</span>
           <div>
-            <p className="text-emerald-400 font-bold text-sm">
+            <p className="text-emerald-700 font-bold text-sm">
               Set aside {fmt(estimate.monthlyReserve)} this month
             </p>
-            <p className="text-emerald-400/60 text-xs mt-0.5">
+            <p className="text-emerald-600/60 text-xs mt-0.5">
               To stay on track for your {fmt(estimate.totalTax)} annual tax bill.
             </p>
           </div>
@@ -202,13 +202,13 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
       {savings > 0 && (
         <button
           onClick={() => setShowComparison((s) => !s)}
-          className="w-full bg-white/5 hover:bg-white/8 transition-colors rounded-xl p-3 text-xs text-center"
+          className="w-full bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl p-3 text-xs text-center border border-slate-100"
         >
-          <span className="text-white/50">
+          <span className="text-slate-500">
             {regime === 'new' ? '🟢 New Regime saves you ' : '🟡 Old Regime saves you '}
-            <span className="text-indigo-400 font-bold">{fmt(savings)}</span> vs {regime === 'new' ? 'Old' : 'New'} Regime
+            <span className="text-indigo-600 font-bold">{fmt(savings)}</span> vs {regime === 'new' ? 'Old' : 'New'} Regime
           </span>
-          <span className="text-white/25 ml-2">{showComparison ? '▲' : '▼'}</span>
+          <span className="text-slate-400 ml-2">{showComparison ? '▲' : '▼'}</span>
         </button>
       )}
 
@@ -222,16 +222,16 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
             className="overflow-hidden"
           >
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Tax Slab Breakdown — {regime === 'new' ? 'New' : 'Old'} Regime</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tax Slab Breakdown — {regime === 'new' ? 'New' : 'Old'} Regime</p>
               {estimate.slabBreakdown.filter((s) => s.taxableInRange > 0).map((slab, i) => (
                 <div key={i} className="flex items-center justify-between text-xs">
-                  <span className="text-white/40">@ {slab.rate}% on {fmt(slab.taxableInRange)}</span>
-                  <span className="text-white/70 font-semibold">{fmt(slab.taxInSlab)}</span>
+                  <span className="text-slate-500">@ {slab.rate}% on {fmt(slab.taxableInRange)}</span>
+                  <span className="text-slate-800 font-semibold">{fmt(slab.taxInSlab)}</span>
                 </div>
               ))}
-              <div className="flex items-center justify-between text-xs border-t border-white/8 pt-2">
-                <span className="text-white/40">4% Health & Education Cess</span>
-                <span className="text-white/70 font-semibold">{fmt(estimate.cess)}</span>
+              <div className="flex items-center justify-between text-xs border-t border-slate-100 pt-2">
+                <span className="text-slate-500">4% Health & Education Cess</span>
+                <span className="text-slate-800 font-semibold">{fmt(estimate.cess)}</span>
               </div>
             </div>
           </motion.div>
@@ -241,7 +241,7 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
       {/* Advance Tax Timeline */}
       {estimate.totalTax > 0 && (
         <div>
-          <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Advance Tax Schedule</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Advance Tax Schedule</p>
           <div className="space-y-2">
             {estimate.advanceTax.map((q, i) => (
               <QuarterRow

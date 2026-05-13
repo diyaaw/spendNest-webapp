@@ -6,18 +6,18 @@ import { useOnboardingStore } from '@/store/useOnboardingStore';
 // ── Data ──────────────────────────────────────────────────────────────────────
 
 const SAFETY_BUFFERS = [
-  { value: 1, label: '1 Month', desc: 'Minimum safety net' },
-  { value: 3, label: '3 Months', desc: 'Recommended baseline' },
-  { value: 6, label: '6 Months', desc: 'Comfortable cushion' },
-  { value: 12, label: '12 Months', desc: 'Maximum security' },
+  { value: 1, label: '1 Mo', desc: 'Minimum' },
+  { value: 3, label: '3 Mos', desc: 'Baseline' },
+  { value: 6, label: '6 Mos', desc: 'Comfort' },
+  { value: 12, label: '12 Mos', desc: 'Secure' },
 ] as const;
 
 const OPTIMIZE_OPTIONS = [
-  { value: 'stability', icon: '🛡️', label: 'Financial Stability' },
+  { value: 'stability', icon: '🛡️', label: 'Stability' },
   { value: 'growth', icon: '📈', label: 'Growth' },
   { value: 'tax-savings', icon: '💰', label: 'Tax Savings' },
-  { value: 'budgeting', icon: '📊', label: 'Better Budgeting' },
-  { value: 'less-anxiety', icon: '🧘', label: 'Less Income Anxiety' },
+  { value: 'budgeting', icon: '📊', label: 'Budgeting' },
+  { value: 'less-anxiety', icon: '🧘', label: 'Peace of Mind' },
 ] as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -35,9 +35,9 @@ function CurrencyInput({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2 block">{label}</label>
+      <label htmlFor={id} className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">{label}</label>
       <div className="relative">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 text-sm font-medium">{currencySymbol}</span>
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">{currencySymbol}</span>
         <input
           id={id}
           type="number"
@@ -45,10 +45,10 @@ function CurrencyInput({
           value={value || ''}
           onChange={(e) => onChange(Number(e.target.value))}
           placeholder={placeholder}
-          className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 hover:border-white/20 transition-all"
+          className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3.5 text-slate-900 text-sm placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 hover:border-slate-300 transition-all"
         />
       </div>
-      {hint && <p className="mt-1.5 text-[11px] text-white/30">{hint}</p>}
+      {hint && <p className="mt-2 text-[10px] text-slate-400 font-medium">{hint}</p>}
     </div>
   );
 }
@@ -75,17 +75,17 @@ export default function Step4Expenses({ onNext, onBack }: Step4Props) {
   const savingsPct = profile.savingsGoalPct;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-black text-white mb-1">Expenses & safety</h1>
-        <p className="text-white/40 text-sm">Build your financial safety net tailored to your income rhythm.</p>
+        <h1 className="text-3xl font-black text-slate-900 mb-2">Expenses & Safety</h1>
+        <p className="text-slate-500 text-sm leading-relaxed">Build your financial safety net tailored to your income rhythm.</p>
       </div>
 
       {/* Expense inputs */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
         <CurrencyInput
           id="avg-monthly-expenses"
-          label="Avg Monthly Expenses"
+          label="Monthly Expenses"
           value={profile.avgMonthlyExpenses}
           onChange={(v) => updateProfile({ avgMonthlyExpenses: v })}
           currencySymbol={currSym}
@@ -94,21 +94,21 @@ export default function Step4Expenses({ onNext, onBack }: Step4Props) {
         />
         <CurrencyInput
           id="emergency-fund-target"
-          label="Emergency Fund Target"
+          label="Safety Net Goal"
           value={profile.emergencyFundTarget}
           onChange={(v) => updateProfile({ emergencyFundTarget: v })}
           currencySymbol={currSym}
           placeholder="e.g. 300000"
-          hint="Total lump sum target amount"
+          hint="Target total emergency fund"
         />
       </div>
 
       {/* Safety buffer */}
       <div>
-        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">
-          Desired income safety buffer
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">
+          Income Safety Buffer
         </p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {SAFETY_BUFFERS.map((b) => (
             <motion.button
               key={b.value}
@@ -118,24 +118,24 @@ export default function Step4Expenses({ onNext, onBack }: Step4Props) {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               className={`
-                flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all duration-200 text-center
+                flex flex-col items-center py-4 px-2 rounded-2xl border-2 transition-all duration-200 text-center
                 ${profile.safetyBufferMonths === b.value
-                  ? 'border-amber-500 bg-amber-500/10 text-white'
-                  : 'border-white/10 bg-white/5 text-white/40 hover:border-white/20'}
+                  ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-100'
+                  : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'}
               `}
             >
-              <span className={`font-black text-sm ${profile.safetyBufferMonths === b.value ? 'text-amber-400' : ''}`}>{b.label}</span>
-              <span className="text-[10px] mt-0.5 leading-tight">{b.desc}</span>
+              <span className={`font-black text-sm ${profile.safetyBufferMonths === b.value ? 'text-white' : 'text-slate-900'}`}>{b.label}</span>
+              <span className={`text-[10px] font-bold mt-1 ${profile.safetyBufferMonths === b.value ? 'text-indigo-100' : 'text-slate-400'}`}>{b.desc}</span>
             </motion.button>
           ))}
         </div>
       </div>
 
       {/* Savings goal slider */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">Monthly savings goal</p>
-          <span className="text-indigo-400 font-black text-lg">{savingsPct}%</span>
+      <div className="p-6 bg-white rounded-2xl border-2 border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Monthly Savings Target</p>
+          <span className="text-indigo-600 font-black text-2xl">{savingsPct}%</span>
         </div>
         <input
           id="savings-goal-slider"
@@ -145,19 +145,19 @@ export default function Step4Expenses({ onNext, onBack }: Step4Props) {
           step={5}
           value={savingsPct}
           onChange={(e) => updateProfile({ savingsGoalPct: Number(e.target.value) })}
-          className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer accent-indigo-500"
+          className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-indigo-600"
         />
-        <div className="flex justify-between text-[10px] text-white/25 mt-1.5">
-          <span>0%</span>
-          <span>20% recommended</span>
-          <span>80%</span>
+        <div className="flex justify-between text-[10px] font-bold text-slate-400 mt-4 uppercase tracking-widest">
+          <span>Min 0%</span>
+          <span className="text-indigo-600">20% is ideal</span>
+          <span>Max 80%</span>
         </div>
       </div>
 
-      {/* Optimization goals — multi-select */}
+      {/* Optimization goals */}
       <div>
-        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">
-          What are you optimizing for? <span className="normal-case font-normal text-white/25">(pick all that apply)</span>
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">
+          What are you optimizing for? <span className="normal-case font-normal text-slate-400">(pick all that apply)</span>
         </p>
         <div className="flex flex-wrap gap-2">
           {OPTIMIZE_OPTIONS.map((o) => {
@@ -171,27 +171,27 @@ export default function Step4Expenses({ onNext, onBack }: Step4Props) {
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
                 className={`
-                  flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-semibold transition-all duration-200
+                  flex items-center gap-2 px-5 py-2.5 rounded-full border-2 text-xs font-bold transition-all duration-200
                   ${active
-                    ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300'
-                    : 'border-white/10 bg-white/5 text-white/45 hover:border-white/20 hover:text-white/65'}
+                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-100'
+                    : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200'}
                 `}
               >
-                <span>{o.icon}</span>
-                <span>{o.label}</span>
+                <span className="text-base">{o.icon}</span>
+                <span className="uppercase tracking-tight">{o.label}</span>
               </motion.button>
             );
           })}
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-4 pt-4">
         <button
           type="button"
           onClick={onBack}
-          className="px-5 py-3.5 rounded-xl border border-white/10 text-white/50 hover:text-white hover:border-white/25 text-sm font-medium transition-all"
+          className="px-8 py-4 rounded-2xl border-2 border-slate-100 text-slate-400 hover:text-slate-600 hover:border-slate-200 text-sm font-bold transition-all"
         >
-          ← Back
+          Back
         </button>
         <motion.button
           id="onboarding-step4-next"
@@ -199,9 +199,12 @@ export default function Step4Expenses({ onNext, onBack }: Step4Props) {
           onClick={onNext}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
-          className="flex-1 py-3.5 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-indigo-900/30 text-sm"
+          className="flex-1 py-4 bg-slate-900 hover:bg-black text-white font-bold rounded-2xl transition-all duration-200 shadow-xl shadow-slate-200 text-sm flex items-center justify-center gap-2"
         >
-          Continue →
+          Continue
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
         </motion.button>
       </div>
     </div>

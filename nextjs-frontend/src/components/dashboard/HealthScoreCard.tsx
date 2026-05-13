@@ -8,10 +8,10 @@ import InsightsList from './InsightsList';
 // ── Colour mapping ─────────────────────────────────────────────────────────────
 
 function scoreColor(score: number) {
-  if (score >= 75) return { ring: '#10B981', bg: 'bg-emerald-500/10', text: 'text-emerald-400', badge: 'bg-emerald-500/15 text-emerald-400', label: 'Excellent' };
-  if (score >= 50) return { ring: '#6366F1', bg: 'bg-indigo-500/10', text: 'text-indigo-400', badge: 'bg-indigo-500/15 text-indigo-400', label: 'Good' };
-  if (score >= 25) return { ring: '#F59E0B', bg: 'bg-amber-500/10', text: 'text-amber-400', badge: 'bg-amber-500/15 text-amber-400', label: 'Fair' };
-  return { ring: '#F43F5E', bg: 'bg-rose-500/10', text: 'text-rose-400', badge: 'bg-rose-500/15 text-rose-400', label: 'At Risk' };
+  if (score >= 75) return { ring: '#6366f1', bg: 'bg-indigo-500/20', text: 'text-indigo-400', badge: 'bg-indigo-500/25 text-indigo-400', label: 'Excellent' };
+  if (score >= 50) return { ring: '#818cf8', bg: 'bg-indigo-500/15', text: 'text-indigo-300', badge: 'bg-indigo-500/20 text-indigo-300', label: 'Good' };
+  if (score >= 25) return { ring: '#a5b4fc', badge: 'bg-indigo-500/10 text-indigo-200', label: 'Fair', bg: 'bg-indigo-500/5', text: 'text-indigo-200' };
+  return { ring: '#4f46e5', badge: 'bg-indigo-900/40 text-indigo-100', label: 'At Risk', bg: 'bg-indigo-900/10', text: 'text-indigo-100' };
 }
 
 // ── Animated circular gauge ────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ function ScoreGauge({ score, color }: { score: number; color: string }) {
     <div className="relative w-40 h-40 mx-auto">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
         {/* Track */}
-        <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="#F1F5F9" strokeWidth="10" />
         {/* Progress */}
         <motion.circle
           cx="60" cy="60" r={r}
@@ -42,14 +42,14 @@ function ScoreGauge({ score, color }: { score: number; color: string }) {
       {/* Score text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <motion.span
-          className="text-4xl font-black text-white leading-none"
+          className="text-4xl font-black text-slate-900 leading-none"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
           {score}
         </motion.span>
-        <span className="text-xs text-white/35 font-medium mt-0.5">/100</span>
+        <span className="text-xs text-slate-400 font-medium mt-0.5">/100</span>
       </div>
     </div>
   );
@@ -64,10 +64,10 @@ function SubScore({ label, score, max, delay }: { label: string; score: number; 
   return (
     <div>
       <div className="flex justify-between text-xs mb-1">
-        <span className="text-white/50">{label}</span>
-        <span className="text-white/70 font-semibold">{displayScore}/{max}</span>
+        <span className="text-slate-500">{label}</span>
+        <span className="text-slate-700 font-semibold">{displayScore}/{max}</span>
       </div>
-      <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
+      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
         <motion.div
           className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full"
           initial={{ width: 0 }}
@@ -137,11 +137,11 @@ export default function HealthScoreCard({ score, loading }: Props) {
 
 
   return (
-    <div className="bg-gradient-to-br from-slate-900 to-[#0d1117] rounded-3xl p-6 border border-white/5 shadow-xl">
+    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Financial Health</h3>
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Financial Health</h3>
           <span className={`inline-block mt-1 text-xs font-bold px-2.5 py-0.5 rounded-full ${c.badge}`}>{score.label}</span>
         </div>
         <div className={`w-10 h-10 ${c.bg} rounded-xl flex items-center justify-center`}>
@@ -166,13 +166,13 @@ export default function HealthScoreCard({ score, loading }: Props) {
       {/* Meta stats */}
       {score.meta && (
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="bg-white/5 rounded-xl p-3 text-center">
-            <p className="text-lg font-black text-white">{score.meta.savingsRate}%</p>
-            <p className="text-[10px] text-white/35 mt-0.5">Savings Rate</p>
+          <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+            <p className="text-lg font-black text-slate-900">{score.meta.savingsRate}%</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Savings Rate</p>
           </div>
-          <div className="bg-white/5 rounded-xl p-3 text-center">
-            <p className="text-lg font-black text-white">{score.meta.monthsRunway}mo</p>
-            <p className="text-[10px] text-white/35 mt-0.5">Runway</p>
+          <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+            <p className="text-lg font-black text-slate-900">{score.meta.monthsRunway}mo</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Runway</p>
           </div>
         </div>
       )}
@@ -180,7 +180,7 @@ export default function HealthScoreCard({ score, loading }: Props) {
       {/* AI Recommendations toggle */}
       <button
         onClick={() => setShowRecs((s) => !s)}
-        className="w-full mt-4 py-2.5 rounded-xl border border-white/10 text-xs font-semibold text-white/50 hover:text-white/80 hover:border-white/20 transition-all"
+        className="w-full mt-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all"
       >
         {showRecs ? 'Hide' : 'View'} AI Recommendations ↓
       </button>
@@ -194,9 +194,9 @@ export default function HealthScoreCard({ score, loading }: Props) {
             className="overflow-hidden"
           >
             <div className="mt-3 space-y-2">
-              {score.recommendations.map((rec) => (
-                <div key={rec} className="flex items-start gap-2 text-xs text-white/50 leading-relaxed">
-                  <span className="text-indigo-400 mt-0.5 flex-shrink-0">→</span>
+              {(score.recommendations || []).map((rec) => (
+                <div key={rec} className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed">
+                  <span className="text-indigo-600 mt-0.5 flex-shrink-0">→</span>
                   <span>{rec}</span>
                 </div>
               ))}
@@ -207,7 +207,7 @@ export default function HealthScoreCard({ score, loading }: Props) {
 
       {/* AI Insights & Trends */}
       {(score.insights?.length > 0 || score.trends) && (
-        <div className="mt-8 pt-6 border-t border-white/5">
+        <div className="mt-8 pt-6 border-t border-slate-100">
           <InsightsList insights={score.insights || []} trends={score.trends} />
         </div>
       )}

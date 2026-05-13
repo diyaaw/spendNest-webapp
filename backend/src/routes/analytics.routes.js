@@ -8,8 +8,8 @@ const {
   getTransactions,
   getInsights,
   getCashflow,
-  getHealthScore,
 } = require('../controllers/analytics.controller');
+const { getHealthScore } = require('../controllers/health.controller');
 const { protect } = require('../middlewares/auth.middleware');
 
 const router = express.Router();

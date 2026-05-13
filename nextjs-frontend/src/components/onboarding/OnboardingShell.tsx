@@ -63,14 +63,14 @@ export default function OnboardingShell() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] flex items-stretch">
+    <div className="min-h-screen bg-slate-50 flex items-stretch">
       {/* ── Left panel — illustration ──────────────────────────── */}
       <div className="hidden lg:flex w-[420px] flex-shrink-0 relative overflow-hidden">
         {/* Background gradient */}
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+            background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 50%, #EEF2FF 100%)',
           }}
         />
         {/* Subtle noise overlay */}
@@ -79,8 +79,8 @@ export default function OnboardingShell() {
           style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }}
         />
         {/* Glow blobs */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/6 w-48 h-48 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-200/50 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/6 w-48 h-48 bg-purple-100/50 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col w-full h-full">
           <OnboardingIllustration step={currentStep} />
@@ -90,14 +90,14 @@ export default function OnboardingShell() {
       {/* ── Right panel — form ─────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-white/5">
+        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-200">
           {/* Mobile logo */}
           <div className="flex items-center gap-2 lg:hidden">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <circle cx="9" cy="12" r="7" fill="#818CF8" fillOpacity="0.8" />
-              <circle cx="15" cy="12" r="7" fill="#93C5FD" fillOpacity="0.7" />
+              <circle cx="9" cy="12" r="7" fill="#4F46E5" fillOpacity="0.8" />
+              <circle cx="15" cy="12" r="7" fill="#818CF8" fillOpacity="0.7" />
             </svg>
-            <span className="text-white font-bold text-base">FlowShield</span>
+            <span className="text-slate-900 font-bold text-base">FlowShield</span>
           </div>
           <div className="hidden lg:block" />
 
@@ -111,7 +111,7 @@ export default function OnboardingShell() {
           </div>
 
           {/* Step counter — mobile */}
-          <div className="md:hidden text-xs text-white/40 font-medium">
+          <div className="md:hidden text-xs text-slate-400 font-medium">
             Step {currentStep} of 5
           </div>
 
@@ -119,8 +119,7 @@ export default function OnboardingShell() {
           <button
             type="button"
             onClick={() => router.replace('/dashboard')}
-
-            className="text-xs text-white/30 hover:text-white/60 transition-colors"
+            className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
           >
             Exit setup
           </button>
@@ -132,9 +131,9 @@ export default function OnboardingShell() {
             {/* Mobile progress */}
             <div className="md:hidden mb-8">
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-xs font-semibold text-indigo-400">{STEP_LABELS[currentStep - 1]}</span>
+                <span className="text-xs font-semibold text-indigo-600">{STEP_LABELS[currentStep - 1]}</span>
               </div>
-              <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-1 bg-slate-200 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full"
                   animate={{ width: `${(currentStep / 5) * 100}%` }}
@@ -155,12 +154,12 @@ export default function OnboardingShell() {
         </div>
 
         {/* Bottom footer */}
-        <div className="px-8 py-4 border-t border-white/5 flex items-center justify-between">
-          <p className="text-[11px] text-white/20">
+        <div className="px-8 py-4 border-t border-slate-200 flex items-center justify-between">
+          <p className="text-[11px] text-slate-400">
             © {new Date().getFullYear()} FlowShield · All rights reserved
           </p>
-          <p className="text-[11px] text-white/20">
-            🔒 256-bit encrypted · SOC 2 compliant
+          <p className="text-[11px] text-slate-400">
+            🔒 Secure · 256-bit encrypted
           </p>
         </div>
       </div>

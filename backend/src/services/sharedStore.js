@@ -20,6 +20,7 @@
 const storage = {
   users: [],       // [{ _id, name, email, password }]
   uploads: [],     // [{ _id, userId, filename, rowCount, summary, transactions, forecast, recommendation }]
+  emergencyFunds: [], // [{ userId, currentSavings, targetMonths }]
 };
 
 // ─── User Store ──────────────────────────────────────────────────────────────
@@ -73,4 +74,22 @@ const UploadStore = {
   }
 };
 
-module.exports = { UserStore, UploadStore };
+// ─── Emergency Fund Store ───────────────────────────────────────────────────
+
+const EmergencyFundStore = {
+  upsert: async (userId, data) => {
+    let fund = storage.emergencyFunds.find(f => String(f.userId) === String(userId));
+    if (!fund) {
+      fund = { userId, currentSavings: 0, targetMonths: 6 };
+      storage.emergencyFunds.push(fund);
+    }
+    Object.assign(fund, data);
+    return fund;
+  },
+
+  findByUserId: async (userId) => {
+    return storage.emergencyFunds.find(f => String(f.userId) === String(userId)) || null;
+  }
+};
+
+module.exports = { UserStore, UploadStore, EmergencyFundStore };

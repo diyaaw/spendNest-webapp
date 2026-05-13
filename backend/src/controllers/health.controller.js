@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction.model');
 const FinancialHealth = require('../models/FinancialHealth.model');
 
-const { isDbConnected } = require('../config/db');  // shared singleton — never define locally
+const { isDbConnected } = require('../config/db');  // shared singleton - never define locally
+const { UploadStore } = require('../services/sharedStore');
 
 /**
  * GET /api/analytics/health-score
@@ -20,17 +21,35 @@ const getHealthScore = async (req, res, next) => {
   try {
     const userId = req.user.id || req.user._id;
 
-    if (!isDbConnected()) {
-      return res.json(emptyScore('Database not connected â€” upload a CSV to generate your score.'));
+    let txs = [];
+    if (isDbConnected() && mongoose.Types.ObjectId.isValid(String(userId))) {
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+      txs = await Transaction.find({
+        userId: new mongoose.Types.ObjectId(String(userId)),
+        date: { $gte: twelveMonthsAgo },
+      }).sort({ date: 1 });
+
+      // Robustness: If no data in last 12 months, take all data (good for old demo CSVs)
+      if (txs.length === 0) {
+        txs = await Transaction.find({
+          userId: new mongoose.Types.ObjectId(String(userId)),
+        }).sort({ date: 1 });
+      }
     }
 
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
-    const txs = await Transaction.find({
-      userId: new mongoose.Types.ObjectId(String(userId)),
-      date: { $gte: twelveMonthsAgo },
-    }).sort({ date: 1 });
+    // Fallback to UploadStore if DB is empty or disconnected
+    if (txs.length === 0) {
+      const uploads = await UploadStore.findByUserId(userId);
+      const target = uploads[0];
+      if (target && target.txDocs) {
+        txs = [...target.txDocs];
+        txs.sort((a, b) => new Date(a.date) - new Date(b.date));
+      }
+    }
+
 
     if (txs.length < 5) {
       return res.json(emptyScore('Upload more transaction data to calculate your Financial Health Score.'));
@@ -91,7 +110,9 @@ const getHealthScore = async (req, res, next) => {
     if (incomeScore < 10) recommendations.push('Income was 0 in some months. Diversify your client base for stability.');
     if (!recommendations.length) recommendations.push('Your financial health is excellent. Keep it up!');
 
-    const healthDoc = await FinancialHealth.findOne({ userId });
+    const healthDoc = mongoose.Types.ObjectId.isValid(String(userId))
+      ? await FinancialHealth.findOne({ userId })
+      : null;
     
     res.json({
       overall,

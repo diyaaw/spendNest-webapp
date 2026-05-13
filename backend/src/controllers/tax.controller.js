@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction.model');
 
-const { isDbConnected } = require('../config/db');  // shared singleton � never define locally
+const { isDbConnected } = require('../config/db');  // shared singleton - never define locally
+const { UploadStore } = require('../services/sharedStore');
 
 // ── Indian Tax Slabs (FY 2024-25) ────────────────────────────────────────────
 
@@ -94,23 +95,58 @@ const getTaxEstimate = async (req, res, next) => {
 
     let grossIncome = parseFloat(req.query.annualIncome) || 0;
 
-    // If no annualIncome supplied, compute from actual DB transactions
-    if (!grossIncome && isDbConnected()) {
-      // Sum income transactions for last 12 months
-      const twelveMonthsAgo = new Date();
-      twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
+    // If no annualIncome supplied, compute from actual transactions
+    if (!grossIncome) {
+      if (isDbConnected() && mongoose.Types.ObjectId.isValid(String(userId))) {
+        // Sum income transactions for last 12 months
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
 
-      const result = await Transaction.aggregate([
-        {
-          $match: {
-            userId: new mongoose.Types.ObjectId(String(userId)),
-            type: 'income',
-            date: { $gte: twelveMonthsAgo },
+        let result = await Transaction.aggregate([
+          {
+            $match: {
+              userId: new mongoose.Types.ObjectId(String(userId)),
+              type: 'income',
+              date: { $gte: twelveMonthsAgo },
+            },
           },
-        },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
-      ]);
-      grossIncome = result[0]?.total ?? 0;
+          { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]);
+
+        // Robustness: if no income in last 12 months, take all time income
+        if (!result.length || !result[0].total) {
+          result = await Transaction.aggregate([
+            {
+              $match: {
+                userId: new mongoose.Types.ObjectId(String(userId)),
+                type: 'income',
+              },
+            },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+          ]);
+        }
+        grossIncome = result[0]?.total ?? 0;
+      }
+
+
+      // Fallback to UploadStore if DB search returned 0 or DB is disconnected
+      if (!grossIncome) {
+        const uploads = await UploadStore.findByUserId(userId);
+        const uniqueTxMap = new Map();
+
+        for (const upload of uploads) {
+          if (!upload.txDocs) continue;
+          for (const tx of upload.txDocs) {
+            if (tx.type !== 'income') continue;
+            // Create a unique key to prevent double-counting same transactions across uploads
+            const key = `${tx.date}_${tx.description}_${tx.amount}`;
+            if (!uniqueTxMap.has(key)) {
+              uniqueTxMap.set(key, tx.amount);
+            }
+          }
+        }
+        grossIncome = Array.from(uniqueTxMap.values()).reduce((sum, amt) => sum + amt, 0);
+      }
     }
 
     const oldRegime = computeTax(grossIncome, 'old');

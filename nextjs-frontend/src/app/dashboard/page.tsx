@@ -58,11 +58,18 @@ function DashboardContent() {
       .then((score) => setHealthScore(score))
       .catch(() => {});
 
-    // Derive annual income from transaction summary for tax card
-    const annualIncome = data.summary?.total_income
-      ? data.summary.total_income * 12  // approximate annualised
-      : 0;
-    setTaxData({ annualIncome });
+    // Fetch actual tax estimate based on detected income streams from backend
+    fetchTaxEstimate()
+      .then((res) => {
+        setTaxData(res);
+      })
+      .catch(() => {
+        // Fallback to naive calculation
+        const annualIncome = data.summary?.total_income
+          ? data.summary.total_income * 12  // approximate annualised
+          : 0;
+        setTaxData({ grossAnnualIncome: annualIncome });
+      });
   }, [data]);
 
   // Show skeleton while hydrating from MongoDB (not the "Upload CSV" empty state)
@@ -106,9 +113,6 @@ function DashboardContent() {
 
   // Recommendation overdraft metadata
   const isOverdraftState   = recommendation?.status === 'overdraft' || isNegativeBalance;
-
-  // For Tax card — annualise all-time total_income
-  const annualIncome = (summary?.total_income ?? 0) * 12;
 
   return (
     <div className="w-full max-w-7xl mx-auto pb-16 px-6 pt-10 space-y-10">
@@ -263,7 +267,7 @@ function DashboardContent() {
           <HealthScoreCard score={healthScore} />
         </div>
         <div className="lg:col-span-3">
-          <TaxEstimatorCard annualIncome={annualIncome} />
+          <TaxEstimatorCard annualIncome={taxData?.grossAnnualIncome ?? 0} />
         </div>
       </div>
 
