@@ -125,7 +125,7 @@ def get_recommendations(df: pd.DataFrame) -> dict:
             balance=current_balance,
             monthly_burn=monthly_burn,
             volatility_score=volatility_score,
-            emergency_target_months=3.0,
+            emergency_target_months=1.0,
         )
 
         reserved_funds = safe_spend_data["reserve"]
@@ -134,8 +134,8 @@ def get_recommendations(df: pd.DataFrame) -> dict:
 
         if safe_to_spend == 0.0:
             message = (
-                f"Your balance (\u20b9{current_balance:,.0f}) is fully committed to a \u20b9{reserved_funds:,.0f} "
-                f"reserve fund. There is nothing left to spend safely right now."
+                f"Your balance (\u20b9{current_balance:,.0f}) is covering your essential month's reserve (\u20b9{reserved_funds:,.0f}). "
+                f"Try to increase your balance to see a safe-to-spend surplus."
             )
 
     # Emergency buffer: 1 month of burn as a dedicated float

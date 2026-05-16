@@ -15,8 +15,8 @@ const OLD_SLABS = [
 
 const NEW_SLABS = [
   { limit: 300_000,   rate: 0 },
-  { limit: 600_000,   rate: 0.05 },
-  { limit: 900_000,   rate: 0.10 },
+  { limit: 700_000,   rate: 0.05 },
+  { limit: 1_000_000, rate: 0.10 },
   { limit: 1_200_000, rate: 0.15 },
   { limit: 1_500_000, rate: 0.20 },
   { limit: Infinity,  rate: 0.30 },
@@ -48,8 +48,13 @@ function rebate87A(taxBeforeRebate, taxableIncome, regime) {
 }
 
 function computeTax(grossIncome, regime) {
+  // Freelancer Presumptive Taxation (Section 44ADA): 
+  // Taxable income is considered 50% of gross receipts.
+  const businessProfit = grossIncome * 0.5;
   const stdDeduction = regime === 'new' ? 75_000 : 50_000;
-  const taxableIncome = Math.max(0, grossIncome - stdDeduction);
+  
+  // Taxable income = 50% profit - deductions
+  const taxableIncome = Math.max(0, businessProfit - stdDeduction);
   const slabs = regime === 'new' ? NEW_SLABS : OLD_SLABS;
   const { tax: taxBeforeRebate, breakdown } = computeSlabTax(taxableIncome, slabs);
   const rebate = rebate87A(taxBeforeRebate, taxableIncome, regime);
@@ -98,54 +103,64 @@ const getTaxEstimate = async (req, res, next) => {
     // If no annualIncome supplied, compute from actual transactions
     if (!grossIncome) {
       if (isDbConnected() && mongoose.Types.ObjectId.isValid(String(userId))) {
-        // Sum income transactions for last 12 months
-        const twelveMonthsAgo = new Date();
-        twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
-
-        let result = await Transaction.aggregate([
+        // Find date range and total income
+        const stats = await Transaction.aggregate([
+          { $match: { userId: new mongoose.Types.ObjectId(String(userId)), type: 'income' } },
           {
-            $match: {
-              userId: new mongoose.Types.ObjectId(String(userId)),
-              type: 'income',
-              date: { $gte: twelveMonthsAgo },
-            },
-          },
-          { $group: { _id: null, total: { $sum: '$amount' } } },
+            $group: {
+              _id: {
+                month: { $month: '$date' },
+                year: { $year: '$date' }
+              },
+              monthlyTotal: { $sum: '$amount' }
+            }
+          }
         ]);
 
-        // Robustness: if no income in last 12 months, take all time income
-        if (!result.length || !result[0].total) {
-          result = await Transaction.aggregate([
-            {
-              $match: {
-                userId: new mongoose.Types.ObjectId(String(userId)),
-                type: 'income',
-              },
-            },
-            { $group: { _id: null, total: { $sum: '$amount' } } },
-          ]);
+        if (stats.length > 0) {
+          const totalIncome = stats.reduce((acc, curr) => acc + curr.monthlyTotal, 0);
+          const monthCount = stats.length;
+          
+          if (monthCount < 11) {
+            grossIncome = (totalIncome / monthCount) * 12;
+          } else {
+            grossIncome = totalIncome;
+          }
         }
-        grossIncome = result[0]?.total ?? 0;
       }
-
 
       // Fallback to UploadStore if DB search returned 0 or DB is disconnected
       if (!grossIncome) {
         const uploads = await UploadStore.findByUserId(userId);
+        const uniqueMonths = new Set();
         const uniqueTxMap = new Map();
+        let total = 0;
 
         for (const upload of uploads) {
           if (!upload.txDocs) continue;
           for (const tx of upload.txDocs) {
             if (tx.type !== 'income') continue;
-            // Create a unique key to prevent double-counting same transactions across uploads
+            
+            const d = new Date(tx.date);
+            if (isNaN(d.getTime())) continue;
+
+            const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+            uniqueMonths.add(monthKey);
+
             const key = `${tx.date}_${tx.description}_${tx.amount}`;
             if (!uniqueTxMap.has(key)) {
               uniqueTxMap.set(key, tx.amount);
+              total += tx.amount;
             }
           }
         }
-        grossIncome = Array.from(uniqueTxMap.values()).reduce((sum, amt) => sum + amt, 0);
+
+        const monthCount = Math.max(1, uniqueMonths.size);
+        if (monthCount < 11) {
+          grossIncome = (total / monthCount) * 12;
+        } else {
+          grossIncome = total;
+        }
       }
     }
 

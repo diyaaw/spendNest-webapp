@@ -74,10 +74,7 @@ const userSchema = new mongoose.Schema(
       default: ['stability'],
     },
 
-    // ── Platform Meta ─────────────────────────────────────────────
     healthScore: { type: Number, min: 0, max: 100, default: 50 },
-    onboardingCompleted: { type: Boolean, default: false },
-    onboardingStep: { type: Number, default: 0 },
     
     // ── Preferences ───────────────────────────────────────────────
     preferences: {

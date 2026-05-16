@@ -264,8 +264,9 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
     if bal_col:
         out["balance"] = clean_currency(df[bal_col])
     else:
-        logger.warning("⚠️  No balance column found — defaulting to 0.0")
+        logger.warning("⚠️  No balance column found — will compute relative balance after amount is determined")
         out["balance"] = 0.0
+
 
     # ── Step 5: AMOUNTS ───────────────────────────────────────────────────────
     if debit_col and credit_col:
@@ -319,6 +320,10 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
                 out["amount"] = 0.0
                 out["credit"] = 0.0
                 out["debit"]  = 0.0
+
+    # ── Step 5.1: Compute relative balance if missing ─────────────────────────
+    if not bal_col:
+        out["balance"] = out["amount"].cumsum()
 
     # ── Step 5.5: TYPE FLAG COLUMN ────────────────────────────────────────────
     # Handles CSVs like: Date, Description, Type, Amount (INR), Balance (INR)

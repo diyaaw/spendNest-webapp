@@ -4,7 +4,7 @@ const User = require('../models/User.model');
 const { UserStore } = require('../services/sharedStore');
 
 // Helper to check if DB is connected
-const { isDbConnected } = require('../config/db');  // shared singleton — never define locally
+const { isDbConnected } = require('../config/db');  // shared singleton - never define locally
 
 // Helper to sign a JWT
 const signToken = (id) =>
@@ -107,41 +107,9 @@ const logout = (req, res) => {
   res.status(200).json({ message: 'Logged out successfully' });
 };
 
-// PATCH /api/auth/onboarding
-const updateOnboarding = async (req, res, next) => {
-  try {
-    const allowedFields = [
-      'country', 'state', 'currency',
-      'freelancerType', 'workCategory', 'incomeFrequency', 'incomeTarget', 'avgMonthlyIncome',
-      'taxFilingStatus', 'gstRegistered', 'taxBracket', 'autoTaxEstimation',
-      'avgMonthlyExpenses', 'emergencyFundTarget', 'safetyBufferMonths', 'savingsGoalPct', 'optimizeFor',
-      'onboardingStep', 'onboardingCompleted',
-    ];
-
-    const updates = {};
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) updates[field] = req.body[field];
-    }
-
-    if (isDbConnected()) {
-      await User.findByIdAndUpdate(req.user._id, { $set: updates }, { returnDocument: 'after', runValidators: true });
-    }
-    // In-memory store doesn't have update â€” silently succeed
-    res.status(200).json({ message: 'Profile updated', updates });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// GET /api/auth/onboarding
-const getOnboarding = async (req, res) => {
-  res.status(200).json({ user: req.user });
-};
-
 // GET /api/auth/me
 const getMe = async (req, res) => {
   res.status(200).json({ user: req.user });
 };
 
-
-module.exports = { register, login, logout, getMe, updateOnboarding, getOnboarding };
+module.exports = { register, login, logout, getMe };

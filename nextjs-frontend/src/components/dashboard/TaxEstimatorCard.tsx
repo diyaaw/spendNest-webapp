@@ -102,7 +102,7 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Tax Estimator</h3>
-          <p className="text-slate-500 text-xs mt-0.5">FY 2024-25 · Indian Freelancer</p>
+          <p className="text-slate-500 text-xs mt-0.5">FY 2024-25 · Sec 44ADA (50% Profit)</p>
         </div>
         {/* Regime toggle */}
         <div className="flex rounded-xl bg-slate-100 p-0.5">

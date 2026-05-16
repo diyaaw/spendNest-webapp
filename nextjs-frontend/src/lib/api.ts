@@ -58,18 +58,6 @@ export const logout = () =>
 export const getMe = () =>
   fetchJson(`${EXPRESS}/api/auth/me`);
 
-// ─── Onboarding ───────────────────────────────────────────────────────────────
-
-export const updateOnboardingProfile = (fields: Record<string, unknown>) =>
-  fetchJson(`${EXPRESS}/api/auth/onboarding`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(fields),
-  });
-
-export const getOnboardingProfile = () =>
-  fetchJson(`${EXPRESS}/api/auth/onboarding`);
-
 // ─── Upload ───────────────────────────────────────────────────────────────────
 
 export const uploadCsvFile = async (file: File, bankName?: string) => {

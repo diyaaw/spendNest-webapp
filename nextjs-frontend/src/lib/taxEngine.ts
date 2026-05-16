@@ -49,9 +49,9 @@ const OLD_REGIME_SLABS = [
 
 const NEW_REGIME_SLABS = [
   { limit: 300_000,   rate: 0,    label: 'Up to ₹3L' },
-  { limit: 600_000,   rate: 0.05, label: '₹3L–₹6L' },
-  { limit: 900_000,   rate: 0.10, label: '₹6L–₹9L' },
-  { limit: 1_200_000, rate: 0.15, label: '₹9L–₹12L' },
+  { limit: 700_000,   rate: 0.05, label: '₹3L–₹7L' },
+  { limit: 1_000_000, rate: 0.10, label: '₹7L–₹10L' },
+  { limit: 1_200_000, rate: 0.15, label: '₹10L–₹12L' },
   { limit: 1_500_000, rate: 0.20, label: '₹12L–₹15L' },
   { limit: Infinity,  rate: 0.30, label: 'Above ₹15L' },
 ];
@@ -111,7 +111,11 @@ export function estimateTax(
     ? standardDeduction
     : Math.max(standardDeduction, businessExpenseDeduction);
 
-  const taxableIncome = Math.max(0, grossAnnualIncome - totalDeduction);
+  // Freelancer Presumptive Taxation (Section 44ADA):
+  // 50% of gross receipts is considered as profit.
+  const businessProfit = grossAnnualIncome * 0.5;
+
+  const taxableIncome = Math.max(0, businessProfit - totalDeduction);
   const slabs = regime === 'new' ? NEW_REGIME_SLABS : OLD_REGIME_SLABS;
   const slabBreakdown = computeSlabs(taxableIncome, slabs);
 

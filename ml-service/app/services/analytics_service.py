@@ -620,7 +620,7 @@ def get_safe_to_spend(
     balance: float,
     monthly_burn: float,
     volatility_score: float = 0.0,
-    emergency_target_months: float = 3.0,
+    emergency_target_months: float = 1.0,
 ) -> dict:
     """
     Calculates how much is genuinely safe to spend.

@@ -25,7 +25,7 @@ export default function LoginPage() {
     try {
       if (mode === 'register') {
         await register(name, email, password);
-        router.replace('/onboarding');
+        router.replace('/dashboard');
       } else {
         await login(email, password);
         router.replace('/dashboard');
