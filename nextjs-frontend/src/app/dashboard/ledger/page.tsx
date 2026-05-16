@@ -35,10 +35,15 @@ function LedgerContent() {
   const fmt = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Dual Ledger</h1>
-        <p className="text-slate-500 mt-1">Manage your available and reserved funds dynamically.</p>
+    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-slate-100">
+        <div className="max-w-2xl space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-widest">
+             ✦ Liquidity Engine
+          </div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">Dual Ledger</h1>
+          <p className="text-slate-400 text-sm font-medium leading-relaxed">Manage your available and reserved funds dynamically using our smart quarantine system.</p>
+        </div>
       </header>
 
       {message && (
@@ -47,39 +52,39 @@ function LedgerContent() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Available */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm flex flex-col relative overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col relative overflow-hidden group hover:shadow-md transition-shadow">
           <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500" />
-          <h3 className="text-lg font-bold text-slate-900 mb-2">Available to Spend</h3>
-          <p className="text-slate-500 text-sm mb-6">Funds that are safe to use for daily expenses.</p>
-          <div className="text-4xl font-black text-emerald-600 tracking-tight mb-8">{fmt(available)}</div>
-          <div className="mt-auto space-y-3 pt-6 border-t border-slate-100">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Move to Quarantined</label>
-            <div className="flex gap-3">
+          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-1">Available to Spend</h3>
+          <p className="text-slate-400 text-xs mb-6 font-medium">Funds safe for daily expenses.</p>
+          <div className="text-3xl font-black text-emerald-600 tracking-tighter mb-8 font-mono">{fmt(available)}</div>
+          <div className="mt-auto space-y-3 pt-6 border-t border-slate-50">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Move to Quarantined</label>
+            <div className="flex gap-2">
               <input type="number" placeholder="Amount" value={quarantineAmt} onChange={(e) => setQuarantineAmt(e.target.value)}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500 transition-colors" />
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500 transition-colors" />
               <button onClick={handleQuarantine} disabled={!quarantineAmt || parseFloat(quarantineAmt) <= 0 || parseFloat(quarantineAmt) > available}
-                className="bg-slate-900 hover:bg-slate-800 text-white px-6 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                className="bg-slate-900 hover:bg-blue-600 text-white px-5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap">
                 Move
               </button>
             </div>
           </div>
         </div>
-
+ 
         {/* Quarantined */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm flex flex-col relative overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col relative overflow-hidden group hover:shadow-md transition-shadow">
           <div className="absolute top-0 left-0 w-full h-1 bg-amber-500" />
-          <h3 className="text-lg font-bold text-slate-900 mb-2">Quarantined (Reserved)</h3>
-          <p className="text-slate-500 text-sm mb-6">Funds reserved for safety and large future expenses.</p>
-          <div className="text-4xl font-black text-amber-600 tracking-tight mb-8">{fmt(quarantined)}</div>
-          <div className="mt-auto space-y-3 pt-6 border-t border-slate-100">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Release to Available</label>
-            <div className="flex gap-3">
+          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-1">Quarantined</h3>
+          <p className="text-slate-400 text-xs mb-6 font-medium">Reserved safety funds.</p>
+          <div className="text-3xl font-black text-amber-600 tracking-tighter mb-8 font-mono">{fmt(quarantined)}</div>
+          <div className="mt-auto space-y-3 pt-6 border-t border-slate-50">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Release to Available</label>
+            <div className="flex gap-2">
               <input type="number" placeholder="Amount" value={transferAmt} onChange={(e) => setTransferAmt(e.target.value)}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500 transition-colors" />
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500 transition-colors" />
               <button onClick={handleTransfer} disabled={!transferAmt || parseFloat(transferAmt) <= 0 || parseFloat(transferAmt) > quarantined}
-                className="bg-slate-900 hover:bg-slate-800 text-white px-6 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                className="bg-slate-900 hover:bg-blue-600 text-white px-5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap">
                 Release
               </button>
             </div>

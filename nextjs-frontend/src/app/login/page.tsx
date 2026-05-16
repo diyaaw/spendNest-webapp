@@ -50,7 +50,7 @@ export default function LoginPage() {
               <circle cx="15" cy="12" r="7" fill="currentColor" className="text-indigo-400/80" />
             </svg>
           </div>
-          <span className="text-2xl font-black text-slate-900 tracking-tight">FlowShield</span>
+          <span className="text-2xl font-black text-slate-900 tracking-tight">SpendNest</span>
         </div>
 
         {/* Card */}

@@ -4,7 +4,7 @@ const Forecast = require('../models/Forecast.model');
 const FinancialHealth = require('../models/FinancialHealth.model');
 const { UploadStore } = require('../services/sharedStore');
 
-const { isDbConnected } = require('../config/db');  // shared singleton � never define locally
+const { isDbConnected } = require('../config/db');  // shared singleton  never define locally
 
 // ─── Shared filter builder ────────────────────────────────────────────────────
 const txFilter = (userId, uploadBatch) => {
@@ -38,13 +38,18 @@ const getSummary = async (req, res, next) => {
     // Fallback to In-Memory
     if (!transactions.length) {
       const uploads = await UploadStore.findByUserId(userId);
-      const target = uploadId
-        ? uploads.find((u) => u.uploadId === uploadId)
-        : uploads[0];
-      if (target) {
-        transactions = target.txDocs;
-        mlSummary      = target.summary;      // trust ML service computed summary
-        mlCurrentMonth = target.currentMonth; // ML pre-computed current-month slice
+      if (uploadId) {
+        const target = uploads.find((u) => u.uploadId === uploadId);
+        if (target) {
+          transactions = target.txDocs;
+          mlSummary = target.summary;
+          mlCurrentMonth = target.currentMonth;
+        }
+      } else {
+        // Aggregate ALL
+        transactions = uploads.reduce((acc, u) => acc.concat(u.txDocs), []);
+        // For summary/currentMonth in aggregate view, we let the logic below re-calculate 
+        // because we don't have a pre-computed aggregate summary from ML yet
       }
     }
 
@@ -167,15 +172,11 @@ const getMonthlyAnalytics = async (req, res, next) => {
 
     if (!transactions.length) {
       const uploads = await UploadStore.findByUserId(userId);
-      const target = uploadId
-        ? uploads.find((u) => u.uploadId === uploadId)
-        : uploads[0];
-      if (target) {
-        // If ML service pre-computed monthly analytics, return them directly
-        if (target.monthlyAnalytics && target.monthlyAnalytics.length > 0) {
-          return res.json(target.monthlyAnalytics);
-        }
-        transactions = target.txDocs;
+      if (uploadId) {
+        const target = uploads.find((u) => u.uploadId === uploadId);
+        if (target) transactions = target.txDocs;
+      } else {
+        transactions = uploads.reduce((acc, u) => acc.concat(u.txDocs), []);
       }
     }
 
@@ -239,13 +240,17 @@ const getCategoryBreakdown = async (req, res, next) => {
 
     // In-Memory Fallback
     const uploads = await UploadStore.findByUserId(userId);
-    const target = uploadId
-      ? uploads.find((u) => u.uploadId === uploadId)
-      : uploads[0];
+    let allTx = [];
+    if (uploadId) {
+      const target = uploads.find((u) => u.uploadId === uploadId);
+      if (target) allTx = [...target.txDocs];
+    } else {
+      allTx = uploads.reduce((acc, u) => acc.concat(u.txDocs), []);
+    }
 
-    if (target) {
+    if (allTx.length) {
       const catMap = {};
-      target.txDocs
+      allTx
         .filter((t) => t.type === 'expense' && t.amount < 0)
         .forEach((t) => {
           const cat = t.category || 'Other';
@@ -434,12 +439,16 @@ const getTransactions = async (req, res, next) => {
     }
 
     const uploads = await UploadStore.findByUserId(userId);
-    const target = uploadId
-      ? uploads.find((u) => u.uploadId === uploadId)
-      : uploads[0];
+    let allTx = [];
+    if (uploadId) {
+      const target = uploads.find((u) => u.uploadId === uploadId);
+      if (target) allTx = [...target.txDocs];
+    } else {
+      // Aggregate ALL uploads for the user
+      allTx = uploads.reduce((acc, u) => acc.concat(u.txDocs), []);
+    }
 
-    if (target) {
-      let allTx = [...target.txDocs];
+    if (allTx.length) {
 
       // Apply in-memory filters
       if (type)     allTx = allTx.filter((t) => t.type === type);
@@ -511,10 +520,12 @@ const getCashflow = async (req, res, next) => {
 
     if (!transactions.length) {
       const uploads = await UploadStore.findByUserId(userId);
-      const target = uploadId
-        ? uploads.find((u) => u.uploadId === uploadId)
-        : uploads[0];
-      if (target) transactions = target.txDocs;
+      if (uploadId) {
+        const target = uploads.find((u) => u.uploadId === uploadId);
+        if (target) transactions = target.txDocs;
+      } else {
+        transactions = uploads.reduce((acc, u) => acc.concat(u.txDocs), []);
+      }
     }
 
     if (!transactions.length) {

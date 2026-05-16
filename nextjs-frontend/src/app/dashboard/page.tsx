@@ -1,317 +1,320 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSpendNestStore } from '@/store/useSpendNestStore';
 import { fetchHealthScore, fetchTaxEstimate } from '@/lib/api';
-import UploadZone from '@/components/dashboard/UploadZone';
-import KpiCard from '@/components/dashboard/KpiCard';
-import MonthlyChart from '@/components/charts/MonthlyChart';
-import CategoryPieChart from '@/components/charts/CategoryPieChart';
-import ForecastChart from '@/components/charts/ForecastChart';
-import TransactionTable from '@/components/dashboard/TransactionTable';
-import InsightsCard from '@/components/dashboard/InsightsCard';
-import HealthScoreCard from '@/components/dashboard/HealthScoreCard';
-import TaxEstimatorCard from '@/components/dashboard/TaxEstimatorCard';
-import SubscriptionTracker from '@/components/dashboard/SubscriptionTracker';
+import { estimateTax } from '@/lib/taxEngine';
+
+// Redesigned Components
+import RedesignedKpiCard from '@/components/dashboard/redesign/RedesignedKpiCard';
+import RedesignedHealthScore from '@/components/dashboard/redesign/RedesignedHealthScore';
+import RedesignedSubscriptionTracker from '@/components/dashboard/redesign/RedesignedSubscriptionTracker';
+import FinancialForecastChart from '@/components/dashboard/redesign/FinancialForecastChart';
+import SpendingDNAChart from '@/components/dashboard/redesign/SpendingDNAChart';
+import NetWorthProjection from '@/components/dashboard/redesign/NetWorthProjection';
+import { 
+  RedesignedProgressCard, 
+  RedesignedTaxEstimator 
+} from '@/components/dashboard/redesign/RedesignedFinanceTools';
+import { RedesignedAiAdvisor } from '@/components/dashboard/redesign/RedesignedAiAdvisor';
+import { RedesignedTransactionTable } from '@/components/dashboard/redesign/RedesignedTransactionTable';
 import BudgetTracker from '@/components/dashboard/BudgetTracker';
 import EmergencyFundTracker from '@/components/dashboard/EmergencyFundTracker';
+import UploadZone from '@/components/dashboard/UploadZone';
 import ClientOnly from '@/components/ClientOnly';
-import FinancialAdvisor from '@/components/dashboard/FinancialAdvisor';
 
-
-// ── Loading skeleton ───────────────────────────────────────────────────────────
+// Icons
+import { 
+  Wallet, TrendingUp, ArrowUpRight, ArrowDownRight, 
+  ShieldCheck, BrainCircuit, RefreshCcw, FileText, PieChart
+} from 'lucide-react';
 
 function DashboardSkeleton() {
   return (
-    <div className="w-full max-w-7xl mx-auto animate-pulse pb-12 pt-8 px-4">
-      <div className="h-10 w-1/3 bg-slate-200 rounded-xl mb-10" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
-        <div className="lg:col-span-2 h-36 bg-white rounded-3xl border border-slate-100 shadow-sm" />
-        <div className="h-36 bg-white rounded-3xl border border-slate-100 shadow-sm" />
-        <div className="h-36 bg-white rounded-3xl border border-slate-100 shadow-sm" />
-        <div className="h-36 bg-white rounded-3xl border border-slate-100 shadow-sm" />
+    <div className="min-h-screen bg-slate-50 p-8 space-y-8 animate-pulse">
+      <div className="h-12 w-48 bg-slate-200 rounded-2xl" />
+      <div className="grid grid-cols-3 gap-8">
+        <div className="col-span-1 h-64 bg-slate-200 rounded-[2rem]" />
+        <div className="col-span-2 h-64 bg-slate-200 rounded-[2rem]" />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div className="lg:col-span-2 h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
-        <div className="h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
-        <div className="lg:col-span-2 h-96 bg-white rounded-3xl border border-slate-100 shadow-sm" />
+      <div className="grid grid-cols-4 gap-8">
+        {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-slate-200 rounded-[2rem]" />)}
       </div>
     </div>
   );
 }
 
-// ── Main dashboard ─────────────────────────────────────────────────────────────
-
-function DashboardContent() {
+function RedesignedDashboardContent() {
   const { data, isHydrating, clearDashboardData, healthScore, setHealthScore } = useSpendNestStore();
   const [taxData, setTaxData] = useState<any>(null);
 
-  // Fetch health score and tax estimate once data is loaded
   useEffect(() => {
     if (!data) return;
+    fetchHealthScore().then(setHealthScore).catch(() => {});
+    
+    // Always calculate real estimate from local data as primary or fallback
+    let annualIncome = data.summary?.total_income ? data.summary.total_income : 0;
+    
+    // If summary income is missing, try using forecast
+    if (annualIncome === 0 && data.forecast?.predicted_income) {
+      annualIncome = data.forecast.predicted_income * 12;
+    }
 
-    // Fetch health score from backend
-    fetchHealthScore()
-      .then((score) => setHealthScore(score))
-      .catch(() => {});
+    const realEstimate = estimateTax(annualIncome, 'new');
+    setTaxData(realEstimate);
 
-    // Fetch actual tax estimate based on detected income streams from backend
-    fetchTaxEstimate()
-      .then((res) => {
-        setTaxData(res);
-      })
-      .catch(() => {
-        // Fallback to naive calculation
-        const annualIncome = data.summary?.total_income
-          ? data.summary.total_income * 12  // approximate annualised
-          : 0;
-        setTaxData({ grossAnnualIncome: annualIncome });
-      });
-  }, [data]);
+    // Optionally override with backend if available
+    fetchTaxEstimate().then(setTaxData).catch(() => {});
+  }, [data, setHealthScore]);
 
-  // Show skeleton while hydrating from MongoDB (not the "Upload CSV" empty state)
   if (isHydrating) return <DashboardSkeleton />;
 
   if (!data) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 min-h-[calc(100vh-4rem)]">
-        <div className="text-center mb-12 max-w-2xl">
-          <h1 className="text-4xl font-extrabold tracking-tight mb-4 text-slate-900">
-            Let's analyze your finances
+      <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex flex-col items-center justify-center p-8">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-12 max-w-2xl"
+        >
+          <h1 className="text-4xl font-black tracking-tighter mb-4 text-slate-900 uppercase">
+            Master <span className="text-blue-600">Your</span> Finances
           </h1>
-          <p className="text-slate-500">
-            Upload your bank statement (CSV) to get instant clarity on your spending, savings, and future outlook.
+          <p className="text-slate-500 text-lg">
+            Upload your bank statement and let our AI engine decode your spending DNA.
           </p>
+        </motion.div>
+        <div className="w-full max-w-xl">
+          <UploadZone />
         </div>
-        <UploadZone />
       </div>
     );
   }
 
-  const { summary, monthly, category, forecast, recommendation, allTransactions, filename } = data;
-  const monthlyData    = monthly ?? [];
-  const categoryData   = category ?? [];
-  const transactions   = allTransactions ?? [];
+  const { summary, monthly, category, forecast, filename, allTransactions } = data;
+  const cm = summary?.current_month;
+  const latestBalance = summary?.latest_balance ?? 0;
+  const isOverdraft = latestBalance < 0;
+  const cmIncome = cm?.income ?? 0;
+  const cmExpenses = cm?.expenses ?? 0;
+  const cmSavings = cm?.savings ?? (cmIncome - cmExpenses);
+  const savingsRate = cmIncome > 0 ? Math.round((cmSavings / cmIncome) * 100) : 0;
 
-  // ── Current-month metrics from the summary ──────────────────────────────────
-  // These are the ONLY values that should power the monthly KPI cards.
-  // Available Balance uses latest_balance (last non-zero balance in the CSV).
-  const cm           = summary?.current_month;
-  const cmIncome     = cm?.income   ?? 0;
-  const cmExpenses   = cm?.expenses ?? 0;
-  const cmSavings    = cm?.savings  ?? (cmIncome - cmExpenses);
-  const cmLabel      = cm?.label    ?? 'This Month';
-  const isOverspend  = cmSavings < 0;
-  const savingsRate  = cmIncome > 0 ? Math.round((cmSavings / cmIncome) * 100) : 0;
+  // 1. Map Forecast Data
+  const forecastChartPoints = [
+    ...(forecast?.historical_income || []).map(h => ({ month: h.month, actual: h.income, predicted: null })),
+    { 
+      month: forecast?.predicted_month || 'Next', 
+      actual: null, 
+      predicted: forecast?.predicted_income || 0 
+    }
+  ];
 
-  // Negative bank balance = overdraft state
-  const latestBalance      = summary?.latest_balance ?? 0;
-  const isNegativeBalance  = latestBalance < 0;
+  // 2. Map Spending DNA (Using Landing Page Colors)
+  const colors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#64748B'];
+  const spendingDNAPoints = (category || []).map((c, i) => ({
+    name: c.name,
+    value: c.value,
+    color: colors[i % colors.length]
+  }));
 
-  // Recommendation overdraft metadata
-  const isOverdraftState   = recommendation?.status === 'overdraft' || isNegativeBalance;
+  // 3. Map Net Worth Projection (Cumulative balance per month)
+  let runningBalance = latestBalance;
+  const netWorthPoints = [...(monthly || [])].reverse().map((m, i) => {
+    const point = { month: m.month, netWorth: runningBalance };
+    runningBalance -= (m.income - m.expenses);
+    return point;
+  }).reverse();
 
   return (
-    <div className="w-full max-w-7xl mx-auto pb-16 px-6 pt-10 space-y-10">
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-24 overflow-x-hidden">
+      
+      {/* ── 1. GLOBAL HEADER ───────────────────────── */}
+      <header className="w-full max-w-7xl mx-auto px-6 py-8 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-100 rounded-full shadow-sm">
+            <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              {summary?.total_transactions ?? 0} Transactions Analyzed
+            </span>
+          </div>
+          {filename && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-100 rounded-full shadow-sm hidden md:flex">
+              <FileText size={12} className="text-blue-600" />
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest truncate max-w-[150px]">
+                {filename}
+              </span>
+            </div>
+          )}
+        </div>
+        
+        <button 
+          onClick={clearDashboardData}
+          className="group flex items-center gap-2 px-5 py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 rounded-2xl transition-all shadow-sm"
+        >
+          <RefreshCcw size={14} className="text-rose-600 group-hover:rotate-180 transition-all duration-500" />
+          <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Reset Analysis</span>
+        </button>
+      </header>
 
-      {/* ── 1. Header ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Your Financial Status</h2>
-          <div className="flex items-center gap-2 mt-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <p className="text-sm text-slate-500">
-              Live analysis of <span className="text-slate-900 font-bold">{summary?.total_transactions ?? 0}</span> transactions
-              {filename && <> from <span className="text-blue-600 font-medium">{filename}</span></>}.
-            </p>
+      <main className="w-full max-w-7xl mx-auto px-6 space-y-6">
+        
+        {/* ── 2. HERO SECTION ───────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <RedesignedKpiCard 
+              title="Available Balance"
+              amount={latestBalance}
+              isOverdraft={isOverdraft}
+              subtext={isOverdraft ? "Account Overdrawn" : "Current Liquidity"}
+              icon={<Wallet size={20} />}
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <RedesignedKpiCard 
+              title="Safe-to-Spend"
+              amount={data.recommendation?.safe_to_spend ?? 0}
+              isHighlight
+              isHero
+              subtext="Optimized limit after covering bills & goals"
+              icon={<BrainCircuit size={24} />}
+              trend="up"
+              trendLabel="AI Recommendation"
+            />
           </div>
         </div>
-        <button
-          onClick={clearDashboardData}
-          className="bg-white text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-900 px-6 py-3 rounded-2xl border border-slate-200 hover:border-slate-400 transition-all shadow-sm"
-        >
-          Reset Data
-        </button>
-      </div>
 
-      {/* ── 2. Hero KPIs ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <KpiCard
-            title="Available Balance"
-            amount={latestBalance}
-            subtext={
-              isNegativeBalance
-                ? `Account in deficit — overdrawn by ₹${Math.abs(latestBalance).toLocaleString('en-IN', { maximumFractionDigits: 0 })}.`
-                : 'Latest balance from your bank statement.'
-            }
-            isOverdraft={isNegativeBalance}
-            size="lg"
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                className={isNegativeBalance ? 'text-rose-400' : 'text-slate-400'}>
-                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/>
-              </svg>
-            }
+        {/* ── 3. MONTHLY PERFORMANCE ─────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <RedesignedKpiCard 
+            title="Income"
+            amount={cmIncome}
+            icon={<ArrowUpRight size={18} className="text-emerald-500" />}
+            subtext={cm?.label || "This Month"}
+          />
+          <RedesignedKpiCard 
+            title="Expenses"
+            amount={cmExpenses}
+            icon={<ArrowDownRight size={18} className="text-rose-500" />}
+            subtext={cm?.label || "This Month"}
+          />
+          <RedesignedKpiCard 
+            title="Net Savings"
+            amount={Math.abs(cmSavings)}
+            isNegative={cmSavings < 0}
+            trend={cmSavings >= 0 ? "up" : "down"}
+            trendLabel={cmSavings >= 0 ? `${savingsRate}% saved` : "Overspending"}
+            subtext="Cash Surplus"
+          />
+          <RedesignedKpiCard 
+            title="AI Forecast"
+            amount={forecast?.predicted_income ?? 0}
+            icon={<TrendingUp size={18} className="text-blue-500" />}
+            subtext="Predicted next month"
           />
         </div>
-        <div className="lg:col-span-2">
-          <KpiCard
-            title={isOverdraftState ? '⚠️ Spending Disabled — Account Overdrawn' : 'You Can Safely Spend'}
-            amount={recommendation?.safe_to_spend ?? 0}
-            subtext={recommendation?.message || 'Estimated amount after covering bills and savings goals.'}
-            isHighlight={!isOverdraftState}
-            isNegative={isOverdraftState}
-            size="lg"
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                className={isOverdraftState ? 'text-rose-400' : 'text-blue-100'}>
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-            }
-          />
+
+        {/* ── 4. ADVANCED ANALYTICS ──────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <FinancialForecastChart data={forecastChartPoints} />
+          </div>
+          <div className="lg:col-span-1">
+            <SpendingDNAChart data={spendingDNAPoints} />
+          </div>
         </div>
-      </div>
-
-      {/* ── 3. Monthly KPI grid ────────────────────────────────────────── */}
-      {/* All four cards read from current_month — NEVER total_income/total_expenses */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-
-        {/* Income This Month */}
-        <KpiCard
-          title={`Income · ${cmLabel}`}
-          amount={cmIncome}
-          subtext={cmIncome === 0 ? 'No income transactions found.' : undefined}
-          isWarning={cmIncome === 0}
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              className="text-emerald-500">
-              <path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>
-            </svg>
-          }
-        />
-
-        {/* Expenses This Month */}
-        <KpiCard
-          title={`Expenses · ${cmLabel}`}
-          amount={cmExpenses}
-          subtext={cmExpenses === 0 ? 'No expense transactions found.' : undefined}
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              className="text-rose-500">
-              <path d="m19 12-7 7-7-7"/><path d="M12 5v14"/>
-            </svg>
-          }
-        />
-
-        {/* Net Savings — red when overspending, green badge when positive */}
-        <KpiCard
-          title={`Net Savings · ${cmLabel}`}
-          amount={Math.abs(cmSavings)}
-          subtext={
-            isOverspend
-              ? `₹${Math.abs(cmSavings).toLocaleString('en-IN', { maximumFractionDigits: 0 })} over budget.`
-              : savingsRate > 0
-                ? `${savingsRate}% of income saved.`
-                : 'Income and expenses are balanced.'
-          }
-          isNegative={isOverspend}
-          trend={isOverspend ? 'down' : cmSavings > 0 ? 'up' : 'neutral'}
-          trendLabel={
-            isOverspend ? 'overspending' :
-            cmSavings > 0 ? `${savingsRate}% savings rate` : undefined
-          }
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              className={isOverspend ? 'text-rose-400' : 'text-indigo-500'}>
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-          }
-        />
-
-        {/* Forecasted Income */}
-        <KpiCard
-          title="Forecasted Income"
-          amount={forecast?.predicted_income ?? 0}
-          subtext={`Expected in ${forecast?.predicted_month || 'next month'}.`}
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              className="text-amber-500">
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-          }
-        />
-      </div>
-
-
-      {/* ── 4. Trends & Insights ──────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <MonthlyChart data={monthlyData} />
+        
+        <div className="grid grid-cols-1 gap-6">
+          <NetWorthProjection data={netWorthPoints} />
         </div>
-        <div className="lg:col-span-1">
-          <InsightsCard summary={summary} categories={categoryData} forecastInsights={forecast?.insights} />
-        </div>
-      </div>
 
-      {/* ── 5. Health Score + Tax Estimator (NEW) ─────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        <div className="lg:col-span-2">
-          <HealthScoreCard score={healthScore} />
+        {/* ── 5. FINANCIAL INTELLIGENCE GRID ─────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-1">
+             <RedesignedHealthScore score={healthScore} />
+          </div>
+          <div className="lg:col-span-1">
+             <RedesignedTaxEstimator annualIncome={taxData?.annualIncome ?? 0} taxData={taxData} />
+          </div>
+          <div className="lg:col-span-1">
+             <EmergencyFundTracker />
+          </div>
+          <div className="lg:col-span-1">
+             <BudgetTracker categories={category} />
+          </div>
         </div>
-        <div className="lg:col-span-3">
-          <TaxEstimatorCard annualIncome={taxData?.grossAnnualIncome ?? 0} />
-        </div>
-      </div>
 
-      {/* ── 6. Category & Forecast ────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
-          <CategoryPieChart data={categoryData} />
+        {/* ── 6. SUBSCRIPTION & BILL TRACKER ─────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3">
+             <RedesignedSubscriptionTracker />
+          </div>
+          <div className="lg:col-span-2 space-y-8">
+             <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm hover:shadow-xl transition-all flex flex-col justify-center">
+                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">AI Insights</h3>
+                <div className="space-y-6">
+                  <div className="flex gap-4">
+                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 h-fit">
+                      <BrainCircuit size={18} />
+                    </div>
+                    <p className="text-xs text-slate-500 font-bold leading-relaxed opacity-80">
+                      You've spent <span className="text-slate-900">£{(12400 / 100).toFixed(2)}</span> on Food & Drink this week. That's <span className="text-rose-500">15% higher</span> than your average.
+                    </p>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 h-fit">
+                      <TrendingUp size={18} />
+                    </div>
+                    <p className="text-xs text-slate-500 font-bold leading-relaxed opacity-80">
+                      Saving an additional <span className="text-slate-900">£50.00</span> this month will complete your <span className="text-emerald-600">Emergency Fund</span> 2 months earlier.
+                    </p>
+                  </div>
+                </div>
+             </div>
+             
+             {/* Dynamic Budget Summary */}
+             <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm hover:shadow-xl transition-all">
+                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">Budget Health</h3>
+                <div className="space-y-6">
+                  {['Shopping', 'Housing', 'Travel'].map((item, i) => (
+                    <div key={item} className="space-y-3">
+                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                        <span className="text-slate-400">{item}</span>
+                        <span className="text-slate-900 font-mono">£{(80 + i*5).toLocaleString()} / £100</span>
+                      </div>
+                      <div className="h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                        <div className="h-full bg-blue-600 rounded-full" style={{ width: `${80 + i*5}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+             </div>
+          </div>
         </div>
-        <div className="lg:col-span-2">
-          <ForecastChart forecastData={forecast} />
+
+        {/* ── 7. TRANSACTION TABLE ──────────────────────────── */}
+        <div className="w-full">
+           <RedesignedTransactionTable transactions={allTransactions} limit={10} />
         </div>
-      </div>
 
-      {/* ── 7. Budget Tracking (NEW) ───────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
-        <BudgetTracker categories={categoryData} />
-      </div>
+      </main>
 
-      {/* ── 7. Recent Transactions ────────────────────────────────────── */}
-      <div className="pt-4">
-        <TransactionTable transactions={transactions} />
-      </div>
+      {/* ── 8. PROACTIVE AI ADVISOR (FAB) ───────────────────── */}
+      <RedesignedAiAdvisor />
 
-      {/* ── 8. Bill Tracker + Emergency Fund (NEW) ────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        <div className="lg:col-span-3">
-          <SubscriptionTracker />
-        </div>
-        <div className="lg:col-span-2">
-          <EmergencyFundTracker />
-        </div>
-      </div>
-
-      {/* ── 9. AI Advisor (Floating) ──────────────────────────────────── */}
-      <FinancialAdvisor />
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
-
   );
 }
 
-export default function DashboardPage() {
+export default function RedesignedDashboardPage() {
   return (
     <ClientOnly fallback={<DashboardSkeleton />}>
-      <DashboardContent />
+      <RedesignedDashboardContent />
     </ClientOnly>
   );
 }

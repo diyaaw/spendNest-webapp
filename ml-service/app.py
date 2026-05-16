@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import pdfplumber
 
 # ── Our parsing pipeline ──────────────────────────────────────────────────────
 from app.utils.normalizer import normalize_dataframe
@@ -118,6 +119,50 @@ def _parse_csv_bytes(content: bytes) -> pd.DataFrame:
         return _try_read_csv(content, "latin-1")
 
 
+def _parse_pdf_bytes(content: bytes) -> pd.DataFrame:
+    """
+    Parse PDF bytes using pdfplumber.
+    Tries to extract tables first. If that fails or results in empty data,
+    it could potentially fall back to regex on text, but table extraction is preferred.
+    """
+    all_data = []
+    try:
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                for table in tables:
+                    if table:
+                        # Convert table to DataFrame
+                        # We assume the first row might be headers or just data
+                        df_table = pd.DataFrame(table)
+                        all_data.append(df_table)
+        
+        if not all_data:
+            logger.warning("⚠️  No tables found in PDF")
+            return pd.DataFrame()
+
+        # Combine all tables
+        combined_df = pd.concat(all_data, ignore_index=True)
+        
+        # Basic cleanup: remove rows that are mostly None/NaN
+        combined_df = combined_df.dropna(how='all')
+        
+        # If the first row looks like headers (contains words like Date, Description, Amount), set it as header
+        if not combined_df.empty:
+            first_row = combined_df.iloc[0].astype(str).str.lower()
+            if any(h in first_row.values for h in ['date', 'description', 'amount', 'balance']):
+                combined_df.columns = combined_df.iloc[0]
+                combined_df = combined_df[1:].reset_index(drop=True)
+            else:
+                # Assign generic names if no headers found
+                combined_df.columns = [f"col_{i}" for i in range(len(combined_df.columns))]
+
+        return combined_df
+    except Exception as e:
+        logger.error(f"❌ PDF parse error: {e}")
+        return pd.DataFrame()
+
+
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -162,8 +207,8 @@ def parse_and_analyze():
     if not uploaded.filename:
         return jsonify({"success": False, "error": "Filename is empty."}), 400
 
-    if not uploaded.filename.lower().endswith(".csv"):
-        return jsonify({"success": False, "error": "Only .csv files are accepted."}), 400
+    if not uploaded.filename.lower().endswith((".csv", ".pdf")):
+        return jsonify({"success": False, "error": "Only .csv and .pdf files are accepted."}), 400
 
     # ── 2. Read raw bytes ────────────────────────────────────────────────────
     content = uploaded.read()
@@ -173,12 +218,15 @@ def parse_and_analyze():
 
     logger.info("📥 Received file: '%s' (%d bytes)", uploaded.filename, len(content))
 
-    # ── 3. Parse CSV → raw DataFrame ────────────────────────────────────────
+    # ── 3. Parse → raw DataFrame ────────────────────────────────────────
     try:
-        raw_df = _parse_csv_bytes(content)
+        if uploaded.filename.lower().endswith(".pdf"):
+            raw_df = _parse_pdf_bytes(content)
+        else:
+            raw_df = _parse_csv_bytes(content)
     except Exception as exc:
-        logger.error("❌ CSV parse error: %s", exc)
-        return jsonify({"success": False, "error": f"Could not read CSV: {exc}"}), 400
+        logger.error("❌ File parse error: %s", exc)
+        return jsonify({"success": False, "error": f"Could not read file: {exc}"}), 400
 
     logger.info("📄 Raw CSV shape: %d rows × %d cols", *raw_df.shape)
 

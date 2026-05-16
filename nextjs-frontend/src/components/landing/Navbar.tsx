@@ -17,7 +17,7 @@ export default function Navbar({ onStartApp }: { onStartApp: () => void }) {
           <div className="w-8 h-8 flex items-center justify-center relative">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="12" r="7" fill="currentColor" className="text-blue-600/80"/><circle cx="15" cy="12" r="7" fill="currentColor" className="text-indigo-400/80"/></svg>
           </div>
-          <span className="text-xl font-black tracking-tight text-slate-900">FlowShield</span>
+          <span className="text-xl font-black tracking-tight text-slate-900">SpendNest</span>
         </div>
         <nav className="hidden md:flex gap-6 items-center">
           {[['features','Features'],['how-it-works','How It Works'],['pricing','Pricing'],['about','About']].map(([id,label]) => (

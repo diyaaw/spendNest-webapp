@@ -60,7 +60,7 @@ export const getMe = () =>
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
 
-export const uploadCsvFile = async (file: File, bankName?: string) => {
+export const uploadStatementFile = async (file: File, bankName?: string) => {
   const formData = new FormData();
   formData.append('file', file);
   if (bankName) formData.append('bankName', bankName);
@@ -128,7 +128,7 @@ const normalizeLedger = (raw: any, forecast: any): any => {
     emergency_buffer:         raw.emergency_buffer ?? raw.emergencyBuffer ?? 0,
     recommended_reserve_rate: raw.recommended_reserve_rate ?? raw.saveRate ?? 0.10,
     monthly_burn:             raw.monthly_burn ?? raw.monthlyBurn ?? 0,
-    message: `Keep ₹${Math.round(reserved).toLocaleString('en-IN')} reserved for taxes & emergencies.`,
+    message: `Keep £${Math.round(reserved).toLocaleString('en-GB')} reserved for taxes & emergencies.`,
     current_balance:  (raw.totalIncome ?? 0) - (raw.totalExpenses ?? 0),
     predicted_income: forecast?.predicted_income ?? 0,
   };
@@ -147,7 +147,7 @@ export const fetchDashboardData = async (uploadId?: string) => {
       tryFetchJson(`${EXPRESS}/api/analytics/categories${qs}`),
       tryFetchJson(`${EXPRESS}/api/analytics/forecast${qs}`),
       tryFetchJson(`${EXPRESS}/api/analytics/ledger${qs}`),
-      fetchJson(`${EXPRESS}/api/analytics/transactions${qs}`),
+      fetchJson(`${EXPRESS}/api/analytics/transactions${qs}${qs ? '&' : '?'}limit=10000`),
       tryFetchJson(`${EXPRESS}/api/analytics/cashflow${qs}`),
       tryFetchJson(`${EXPRESS}/api/analytics/insights${qs}`),
     ]);

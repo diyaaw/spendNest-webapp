@@ -20,7 +20,7 @@ const VALID_TYPES = new Set(['income', 'expense', 'transfer', 'refund', 'unknown
  * 3. Persists transactions, ledger, and forecast to MongoDB (or In-Memory store).
  * 4. Returns { uploadId, filename, rowCount, summary } to the frontend.
  */
-const uploadCsv = async (req, res, next) => {
+const uploadStatement = async (req, res, next) => {
   // ── 1. Validate uploaded file ──────────────────────────────────────────────
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded. Please attach a CSV file.' });
@@ -58,7 +58,7 @@ const uploadCsv = async (req, res, next) => {
   // ── 3. Validate ML response ────────────────────────────────────────────────
   if (!mlResult.transactions || mlResult.transactions.length === 0) {
     return res.status(422).json({
-      message: 'The ML service parsed the file but found no valid transactions. Check that the CSV has Date and Amount/Debit/Credit columns.',
+      message: 'The ML service parsed the file but found no valid transactions. Check that the file has Date and Amount columns.',
     });
   }
 
@@ -98,7 +98,7 @@ const uploadCsv = async (req, res, next) => {
       category:    tx.category || 'other',
       isRecurring: tx.is_likely_recurring ?? tx.is_recurring ?? false,
       isAnomaly:   tx.is_anomaly   ?? false,
-      source:      'csv_upload',
+      source:      'statement_upload',
       uploadBatch: uploadId,
       bank,
     };
@@ -181,7 +181,7 @@ const uploadCsv = async (req, res, next) => {
       // e) Audit Log
       await AuditLog.create({
         userId,
-        action: 'csv_upload',
+        action: 'statement_upload',
         metadata: {
           filename:    req.file.originalname,
           rowCount:    txDocs.length,
@@ -233,4 +233,6 @@ const uploadCsv = async (req, res, next) => {
 };
 
 
-module.exports = { uploadCsv };
+module.exports = { uploadStatement };
+
+

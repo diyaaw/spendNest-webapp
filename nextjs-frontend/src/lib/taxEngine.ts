@@ -202,5 +202,8 @@ export function getCurrentAdvanceTaxDue(estimate: TaxEstimate): AdvanceTaxSchedu
   return null;
 }
 
-export const fmt = (n: number) =>
-  '₹' + Math.round(n).toLocaleString('en-IN');
+export const fmt = (n: number) => {
+  // Prevent astronomical numbers
+  const safeVal = Math.abs(n) > 1000000000 ? 0 : n;
+  return '£' + Math.round(safeVal).toLocaleString('en-GB');
+};

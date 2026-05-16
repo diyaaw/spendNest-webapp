@@ -5,15 +5,17 @@ const multer = require('multer');
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  const isCsv =
+  const isAllowed =
     file.mimetype === 'text/csv' ||
     file.mimetype === 'application/vnd.ms-excel' ||
-    file.originalname.toLowerCase().endsWith('.csv');
+    file.mimetype === 'application/pdf' ||
+    file.originalname.toLowerCase().endsWith('.csv') ||
+    file.originalname.toLowerCase().endsWith('.pdf');
 
-  if (isCsv) {
+  if (isAllowed) {
     cb(null, true);
   } else {
-    cb(new Error('Only .csv files are accepted'), false);
+    cb(new Error('Only .csv and .pdf files are accepted'), false);
   }
 };
 

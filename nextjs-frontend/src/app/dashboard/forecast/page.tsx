@@ -78,16 +78,16 @@ function ForecastContent() {
   const stabilityColor = stabilityScore > 70 ? 'text-emerald-500' : stabilityScore > 40 ? 'text-amber-500' : 'text-rose-500';
 
   return (
-    <div className="p-10 max-w-7xl mx-auto space-y-10">
+    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
 
       {/* ── Header ───────────────────────────────────────────────── */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-slate-50">
         <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest mb-4">
-             ✦ AI Intelligence · WMA (0.5 / 0.3 / 0.2)
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-widest mb-3">
+             ✦ AI Intelligence · WMA Model
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">Financial Forecast</h1>
-          <p className="text-slate-500 text-lg mt-2">Predictive analysis of your income and cash flow trends for the upcoming months.</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">Financial Forecast</h1>
+          <p className="text-slate-400 text-sm mt-2 font-medium">Predictive analysis of your income and cash flow trends for the upcoming months.</p>
         </div>
         <div className="flex items-center gap-3">
            <div className="text-right hidden sm:block">

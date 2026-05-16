@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { uploadCsvFile } from '@/lib/api';
+import { uploadStatementFile } from '@/lib/api';
 import { useSpendNestStore } from '@/store/useSpendNestStore';
 
 export default function UploadZone() {
@@ -17,8 +17,10 @@ export default function UploadZone() {
 
   const handleFile = (selectedFile: File | null) => {
     if (selectedFile) {
-      if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
-        setError('Invalid file type. Please select a valid .csv file.');
+      const isAllowed = selectedFile.name.toLowerCase().endsWith('.csv') || 
+                        selectedFile.name.toLowerCase().endsWith('.pdf');
+      if (!isAllowed) {
+        setError('Invalid file type. Please select a .csv or .pdf file.');
         setFile(null);
         return;
       }
@@ -32,7 +34,7 @@ export default function UploadZone() {
     setIsUploading(true);
     setError('');
     try {
-      const data = await uploadCsvFile(file, bankName);
+      const data = await uploadStatementFile(file, bankName);
       setDashboardData(data);
       router.refresh(); // re-render dashboard page with new data
     } catch (err: any) {
@@ -67,7 +69,7 @@ export default function UploadZone() {
         <input
           type="file"
           className="hidden"
-          accept=".csv"
+          accept=".csv,.pdf"
           ref={fileInputRef}
           onChange={(e) => handleFile(e.target.files?.[0] || null)}
           disabled={isUploading}
@@ -106,8 +108,8 @@ export default function UploadZone() {
           </>
         ) : (
           <>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Upload Bank Statement CSV</h3>
-            <p className="text-slate-500 text-sm mb-6">Drag and drop or click to browse</p>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Upload Bank Statement</h3>
+            <p className="text-slate-500 text-sm mb-6">Drag and drop or click to browse (.csv, .pdf)</p>
             <div className="bg-white text-slate-700 px-6 py-2 rounded-full font-medium text-sm border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors">
               Select File
             </div>
