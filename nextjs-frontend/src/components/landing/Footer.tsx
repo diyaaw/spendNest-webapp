@@ -22,7 +22,7 @@ export default function Footer() {
           <div className="lg:col-span-2 flex flex-col items-start">
             <Logo/>
             <p className="text-sm text-slate-500 mb-1 mt-4">Intelligent Finance Analytics Engine</p>
-            <p className="text-sm text-slate-400 mb-6">San Francisco, CA 94105</p>
+            <p className="text-sm text-slate-400 mb-6">Indore, MP</p>
             <div className="flex gap-3 mb-6">
               {socialIcons.map((icon, i) => (
                 <a key={i} href="#" className="w-8 h-8 rounded border border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors bg-slate-50">{icon}</a>

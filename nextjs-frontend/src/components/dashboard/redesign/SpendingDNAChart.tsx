@@ -103,7 +103,7 @@ export default function SpendingDNAChart({ data }: { data: any[] }) {
               "font-black text-slate-900 tracking-tighter leading-none block",
               fontSizeClass
             )}>
-              £{totalStr}
+              ₹{totalStr}
             </span>
           </div>
         </div>

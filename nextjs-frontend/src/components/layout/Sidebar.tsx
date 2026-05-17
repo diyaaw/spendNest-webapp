@@ -15,6 +15,7 @@ import { motion } from 'framer-motion';
 const mainMenu = [
   { href: '/dashboard', exact: true, label: 'Overview', icon: <LayoutGrid size={20} /> },
   { href: '/dashboard/transactions', label: 'Transactions', icon: <ReceiptText size={20} /> },
+  { href: '/dashboard/subscriptions', label: 'Subscriptions', icon: <RefreshCw size={20} /> },
   { href: '/dashboard/forecast', label: 'Forecast', icon: <LineChart size={20} /> },
   { href: '/dashboard/ledger', label: 'Ledger', icon: <BookOpen size={20} /> },
 ];

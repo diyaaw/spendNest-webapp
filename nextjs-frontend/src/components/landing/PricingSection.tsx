@@ -2,9 +2,9 @@
 import RevealOnScroll from './RevealOnScroll';
 
 const plans = [
-  { name:'Free Starter', price:'$0', duration:'/forever', description:'Perfect for students and individuals wanting basic analytics.', features:['Upload up to 500 rows/month','Basic Categorization','Monthly Summaries','Community Support'], isPopular:false, cta:'Start Free' },
-  { name:'Pro Shield', price:'$9', duration:'/month', description:'Advanced analytics and forecasting for personal finance power users.', features:['Unlimited CSV Uploads','Smart Custom Categories','Predictive SMA Forecasting','Safe-to-Spend Recommendations','Priority Support'], isPopular:true, cta:'Get Pro' },
-  { name:'Enterprise', price:'$49', duration:'/month', description:'For small businesses needing advanced custom rules and multi-account sync.', features:['Multi-account Aggregation','Custom Rule Engine','Export Analytics to PDF','API Access','Dedicated Manager'], isPopular:false, cta:'Contact Sales' },
+  { name:'Free Starter', price:'₹0', duration:'/forever', description:'Perfect for students and individuals wanting basic analytics.', features:['Upload up to 500 rows/month','Basic Categorization','Monthly Summaries','Community Support'], isPopular:false, cta:'Start Free' },
+  { name:'Pro Shield', price:'₹99', duration:'/month', description:'Advanced analytics and forecasting for personal finance power users.', features:['Unlimited CSV Uploads','Smart Custom Categories','Predictive SMA Forecasting','Safe-to-Spend Recommendations','Priority Support'], isPopular:true, cta:'Get Pro' },
+  { name:'Enterprise', price:'₹499', duration:'/month', description:'For small businesses needing advanced custom rules and multi-account sync.', features:['Multi-account Aggregation','Custom Rule Engine','Export Analytics to PDF','API Access','Dedicated Manager'], isPopular:false, cta:'Contact Sales' },
 ];
 
 export default function PricingSection({ onStartApp }: { onStartApp: () => void }) {

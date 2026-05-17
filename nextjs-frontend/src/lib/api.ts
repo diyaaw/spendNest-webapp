@@ -128,7 +128,7 @@ const normalizeLedger = (raw: any, forecast: any): any => {
     emergency_buffer:         raw.emergency_buffer ?? raw.emergencyBuffer ?? 0,
     recommended_reserve_rate: raw.recommended_reserve_rate ?? raw.saveRate ?? 0.10,
     monthly_burn:             raw.monthly_burn ?? raw.monthlyBurn ?? 0,
-    message: `Keep £${Math.round(reserved).toLocaleString('en-GB')} reserved for taxes & emergencies.`,
+    message: `Keep ₹${Math.round(reserved).toLocaleString('en-IN')} reserved for taxes & emergencies.`,
     current_balance:  (raw.totalIncome ?? 0) - (raw.totalExpenses ?? 0),
     predicted_income: forecast?.predicted_income ?? 0,
   };

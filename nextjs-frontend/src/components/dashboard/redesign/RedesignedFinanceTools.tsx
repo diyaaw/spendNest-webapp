@@ -45,8 +45,8 @@ export function RedesignedProgressCard({ title, current, goal, icon: Icon, color
           />
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">£{current.toLocaleString()}</span>
-          <span className="text-[8px] text-slate-500 font-black uppercase tracking-wider opacity-70">Goal: £{goal.toLocaleString()}</span>
+          <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">₹{current.toLocaleString()}</span>
+          <span className="text-[8px] text-slate-500 font-black uppercase tracking-wider opacity-70">Goal: ₹{goal.toLocaleString()}</span>
         </div>
         {subtext && <p className="text-[9px] text-slate-500 font-bold opacity-60 leading-relaxed">{subtext}</p>}
       </div>
@@ -85,7 +85,7 @@ export function RedesignedTaxEstimator({ annualIncome, taxData }: { annualIncome
         <div className="space-y-1">
           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Gross Annual</span>
           <p className="text-3xl font-black text-slate-900 tracking-tighter leading-none">
-            £{displayIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            ₹{displayIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </p>
         </div>
 
@@ -93,7 +93,7 @@ export function RedesignedTaxEstimator({ annualIncome, taxData }: { annualIncome
           <div className="flex items-center justify-between">
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Est. Liability</span>
             <span className="text-2xl font-mono font-black text-blue-600 tracking-tighter">
-              £{displayTax.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              ₹{displayTax.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </span>
           </div>
           

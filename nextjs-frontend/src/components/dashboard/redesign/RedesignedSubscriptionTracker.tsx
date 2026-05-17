@@ -17,7 +17,7 @@ interface Sub {
 
 const MOCK_SUBS: Sub[] = [
   { id: '1', name: 'Netflix', amount: 15.99, date: '20 May 2026', category: 'Streaming', alert: 'Renewing in 3 days', logoColor: 'bg-rose-500' },
-  { id: '2', name: 'AWS Cloud', amount: 42.00, date: '18 May 2026', category: 'DevOps', alert: 'Usage spike detected (+£4.00)', logoColor: 'bg-orange-500' },
+  { id: '2', name: 'AWS Cloud', amount: 42.00, date: '18 May 2026', category: 'DevOps', alert: 'Usage spike detected (+₹4.00)', logoColor: 'bg-orange-500' },
   { id: '3', name: 'Spotify Premium', amount: 11.99, date: '01 Jun 2026', category: 'Music', logoColor: 'bg-emerald-500' },
   { id: '4', name: 'Claude Pro', amount: 16.50, date: '25 May 2026', category: 'AI Tools', logoColor: 'bg-slate-900' },
   { id: '5', name: 'British Gas', amount: 128.00, date: '19 May 2026', category: 'Utilities', alert: 'Settlement tomorrow', logoColor: 'bg-blue-600' },
@@ -111,7 +111,7 @@ export default function RedesignedSubscriptionTracker() {
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <span className="text-sm font-mono font-black text-slate-900 leading-none block">£{sub.amount.toFixed(2)}</span>
+                      <span className="text-sm font-mono font-black text-slate-900 leading-none block">₹{sub.amount.toFixed(2)}</span>
                     </div>
                   </div>
                   
@@ -149,7 +149,7 @@ export default function RedesignedSubscriptionTracker() {
                     </div>
                     <div>
                       <span className="text-xl font-mono font-black text-slate-900 tracking-tighter leading-none block mb-0.5">
-                        £{catTotal.toFixed(0)}
+                        ₹{catTotal.toFixed(0)}
                       </span>
                       <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
                         {MOCK_SUBS.filter(s => s.category === cat).length} Active
@@ -178,7 +178,7 @@ export default function RedesignedSubscriptionTracker() {
         </div>
         <div className="text-right">
           <span className="text-2xl font-mono font-black text-blue-600 tracking-tighter block leading-none">
-            £{totalCommitment.toLocaleString('en-GB', { minimumFractionDigits: 0 })}
+            ₹{totalCommitment.toLocaleString('en-IN', { minimumFractionDigits: 0 })}
           </span>
           <button className="mt-2 text-[8px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest flex items-center gap-1 ml-auto transition-colors">
              Details <Plus size={8} />

@@ -259,7 +259,7 @@ function RedesignedDashboardContent() {
                       <BrainCircuit size={18} />
                     </div>
                     <p className="text-xs text-slate-500 font-bold leading-relaxed opacity-80">
-                      You've spent <span className="text-slate-900">£{(12400 / 100).toFixed(2)}</span> on Food & Drink this week. That's <span className="text-rose-500">15% higher</span> than your average.
+                      You've spent <span className="text-slate-900">₹{(12400 / 100).toFixed(2)}</span> on Food & Drink this week. That's <span className="text-rose-500">15% higher</span> than your average.
                     </p>
                   </div>
                   <div className="flex gap-4">
@@ -267,7 +267,7 @@ function RedesignedDashboardContent() {
                       <TrendingUp size={18} />
                     </div>
                     <p className="text-xs text-slate-500 font-bold leading-relaxed opacity-80">
-                      Saving an additional <span className="text-slate-900">£50.00</span> this month will complete your <span className="text-emerald-600">Emergency Fund</span> 2 months earlier.
+                      Saving an additional <span className="text-slate-900">₹50.00</span> this month will complete your <span className="text-emerald-600">Emergency Fund</span> 2 months earlier.
                     </p>
                   </div>
                 </div>
@@ -281,7 +281,7 @@ function RedesignedDashboardContent() {
                     <div key={item} className="space-y-3">
                       <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
                         <span className="text-slate-400">{item}</span>
-                        <span className="text-slate-900 font-mono">£{(80 + i*5).toLocaleString()} / £100</span>
+                        <span className="text-slate-900 font-mono">₹{(80 + i*5).toLocaleString()} / ₹100</span>
                       </div>
                       <div className="h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
                         <div className="h-full bg-blue-600 rounded-full" style={{ width: `${80 + i*5}%` }} />

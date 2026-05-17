@@ -7,6 +7,7 @@ import { Bell, LayoutGrid, Calendar, ShieldCheck } from 'lucide-react';
 const LABELS: Record<string, string> = {
   dashboard: 'Overview',
   transactions: 'Transactions',
+  subscriptions: 'Subscriptions',
   forecast: 'Predictive',
   ledger: 'Accounts',
   tax: 'Tax Intelligence',
@@ -25,7 +26,7 @@ export default function DashboardHeader() {
     : '?';
 
   // Use native Intl for date formatting
-  const formattedDate = new Intl.DateTimeFormat('en-GB', {
+  const formattedDate = new Intl.DateTimeFormat('en-IN', {
     weekday: 'long',
     day: 'numeric',
     month: 'long'

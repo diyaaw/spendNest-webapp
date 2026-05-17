@@ -105,7 +105,7 @@ export default function BudgetTracker({ categories }: { categories: { name: stri
                 
                 <div className="text-right space-y-0.5">
                   <div className="flex items-baseline justify-end gap-1">
-                    <span className="text-sm font-black text-slate-900 font-mono tracking-tighter">£{Math.round(spent).toLocaleString()}</span>
+                    <span className="text-sm font-black text-slate-900 font-mono tracking-tighter">₹{Math.round(spent).toLocaleString()}</span>
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">/ {limit > 0 ? limit.toLocaleString() : '---'}</span>
                   </div>
                   <button 

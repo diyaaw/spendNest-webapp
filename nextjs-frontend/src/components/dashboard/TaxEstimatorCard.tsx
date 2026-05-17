@@ -134,7 +134,7 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-3xl rounded-full pointer-events-none" />
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Total Taxable Turnover</p>
         <div className="flex items-center gap-4">
-          <span className="text-4xl font-light text-slate-300 font-mono">£</span>
+          <span className="text-4xl font-light text-slate-300 font-mono">₹</span>
           {isEditingIncome ? (
             <input
               type="number"
@@ -149,7 +149,7 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
               onClick={() => setIsEditingIncome(true)}
               className="flex-1 text-left text-4xl md:text-5xl font-black text-slate-900 hover:text-blue-600 transition-all font-mono tracking-tighter leading-none"
             >
-              {customIncome > 0 ? Math.round(customIncome).toLocaleString('en-GB') : "0"}
+              {customIncome > 0 ? Math.round(customIncome).toLocaleString('en-IN') : "0"}
             </button>
           )}
           <button 

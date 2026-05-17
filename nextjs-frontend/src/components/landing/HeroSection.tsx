@@ -1,5 +1,5 @@
 'use client';
-const bgCards = [
+const bgCards1 = [
   { title: 'INCOME', sub: 'Monthly Salary', color: 'from-blue-100 to-indigo-50' },
   { title: 'FOOD', sub: 'Dining & Groceries', color: 'from-orange-100 to-rose-50' },
   { title: 'TRAVEL', sub: 'Uber & Flights', color: 'from-cyan-100 to-blue-50' },
@@ -7,6 +7,16 @@ const bgCards = [
   { title: 'SHOPPING', sub: 'Amazon & Retail', color: 'from-pink-100 to-rose-50' },
   { title: 'UTILITIES', sub: 'Bills & WiFi', color: 'from-sky-100 to-blue-50' },
   { title: 'HEALTH', sub: 'Pharmacy & Care', color: 'from-emerald-100 to-teal-50' },
+];
+
+const bgCards2 = [
+  { title: 'SUBSCRIPTIONS', sub: 'Spotify & Netflix', color: 'from-fuchsia-100 to-pink-50' },
+  { title: 'INVESTING', sub: 'Stocks & Crypto', color: 'from-emerald-100 to-green-50' },
+  { title: 'PETS', sub: 'Vet & Food', color: 'from-amber-100 to-orange-50' },
+  { title: 'EDUCATION', sub: 'Courses & Books', color: 'from-blue-100 to-sky-50' },
+  { title: 'HOME', sub: 'Rent & Repairs', color: 'from-rose-100 to-red-50' },
+  { title: 'GIFTS', sub: 'Presents & Charity', color: 'from-violet-100 to-purple-50' },
+  { title: 'BEAUTY', sub: 'Salon & Spa', color: 'from-pink-100 to-rose-50' },
 ];
 
 export default function HeroSection({ onStartApp }: { onStartApp: () => void }) {
@@ -17,18 +27,32 @@ export default function HeroSection({ onStartApp }: { onStartApp: () => void }) 
       </h1>
 
       <div className="relative w-full max-w-[1200px] h-[550px] sm:h-[600px] flex justify-center items-center mb-16">
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center gap-4 sm:gap-6 px-4 overflow-hidden">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 overflow-hidden">
           <div className="absolute left-0 top-0 bottom-0 w-1/4 sm:w-1/3 bg-gradient-to-r from-slate-50 via-slate-50/80 to-transparent z-10 pointer-events-none"/>
           <div className="absolute right-0 top-0 bottom-0 w-1/4 sm:w-1/3 bg-gradient-to-l from-slate-50 via-slate-50/80 to-transparent z-10 pointer-events-none"/>
-          <div className="flex gap-4 sm:gap-6 w-max whitespace-nowrap px-10 items-center justify-center animate-fade-in-up delay-100">
-            {bgCards.map((card, idx) => (
-              <div key={idx} className={`w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] rounded-2xl bg-gradient-to-br ${card.color} p-4 flex flex-col justify-end relative overflow-hidden interactive-card border border-white`}>
-                <div className="relative z-10">
-                  <h3 className="text-slate-800 font-bold text-sm sm:text-lg tracking-wider">{card.title}</h3>
-                  <p className="text-slate-600 text-xs sm:text-sm font-medium mt-1 truncate">{card.sub}</p>
+          
+          <div className="w-full animate-fade-in-up delay-100 flex flex-col items-center gap-6">
+            <div className="flex animate-marquee-left gap-4 sm:gap-6 w-max items-center">
+              {[...bgCards1, ...bgCards1, ...bgCards1, ...bgCards1].map((card, idx) => (
+                <div key={`r1-${idx}`} className={`w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] rounded-2xl bg-gradient-to-br ${card.color} p-4 flex flex-col justify-end relative overflow-hidden interactive-card border border-white shrink-0`}>
+                  <div className="relative z-10">
+                    <h3 className="text-slate-800 font-bold text-sm sm:text-lg tracking-wider">{card.title}</h3>
+                    <p className="text-slate-600 text-xs sm:text-sm font-medium mt-1 truncate">{card.sub}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            <div className="flex animate-marquee-right gap-4 sm:gap-6 w-max items-center">
+              {[...bgCards2, ...bgCards2, ...bgCards2, ...bgCards2].map((card, idx) => (
+                <div key={`r2-${idx}`} className={`w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] rounded-2xl bg-gradient-to-br ${card.color} p-4 flex flex-col justify-end relative overflow-hidden interactive-card border border-white shrink-0`}>
+                  <div className="relative z-10">
+                    <h3 className="text-slate-800 font-bold text-sm sm:text-lg tracking-wider">{card.title}</h3>
+                    <p className="text-slate-600 text-xs sm:text-sm font-medium mt-1 truncate">{card.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -44,15 +68,15 @@ export default function HeroSection({ onStartApp }: { onStartApp: () => void }) 
             </div>
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
               <p className="text-xs text-slate-500 mb-1">Safe to Spend</p>
-              <h2 className="text-3xl font-black text-slate-900">$2,450.00</h2>
+              <h2 className="text-3xl font-black text-slate-900">₹2,450.00</h2>
               <p className="text-[10px] text-blue-600 mt-2 font-medium bg-blue-100 inline-block px-2 py-1 rounded">Looks good until next payday.</p>
             </div>
             <div className="flex-1 bg-white rounded-2xl border border-slate-100 p-4 flex flex-col gap-3 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Activity</h3>
               {[
-                { emoji: '🍔', name: 'Swiggy Delivery', cat: 'Food', amount: '-$18.50', bg: 'bg-orange-100', text: 'text-orange-600', color: 'text-slate-800' },
-                { emoji: '🚗', name: 'Uber Ride', cat: 'Travel', amount: '-$12.00', bg: 'bg-blue-100', text: 'text-blue-600', color: 'text-slate-800' },
-                { emoji: '💼', name: 'Salary Inc', cat: 'Income', amount: '+$3,500.00', bg: 'bg-emerald-100', text: 'text-emerald-600', color: 'text-emerald-600' },
+                { emoji: '🍔', name: 'Swiggy Delivery', cat: 'Food', amount: '-₹18.50', bg: 'bg-orange-100', text: 'text-orange-600', color: 'text-slate-800' },
+                { emoji: '🚗', name: 'Uber Ride', cat: 'Travel', amount: '-₹12.00', bg: 'bg-blue-100', text: 'text-blue-600', color: 'text-slate-800' },
+                { emoji: '💼', name: 'Salary Inc', cat: 'Income', amount: '+₹3,500.00', bg: 'bg-emerald-100', text: 'text-emerald-600', color: 'text-emerald-600' },
               ].map((tx) => (
                 <div key={tx.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

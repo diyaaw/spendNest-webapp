@@ -69,10 +69,10 @@ export default function NetWorthProjection({ data, loading = false }: NetWorthPr
               fontWeight={700}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(value) => `£${Math.abs(value) >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`} 
+              tickFormatter={(value) => `₹${Math.abs(value) >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`} 
             />
             <Tooltip 
-              formatter={(value: any) => [`£${value.toLocaleString()}`, 'Net Worth']}
+              formatter={(value: any) => [`₹${value.toLocaleString()}`, 'Net Worth']}
               contentStyle={{ 
                 backgroundColor: '#0F172A', 
                 border: 'none', 
@@ -111,7 +111,7 @@ export default function NetWorthProjection({ data, loading = false }: NetWorthPr
         <div className="p-6 bg-slate-50 border border-slate-100 rounded-[2rem] flex flex-col gap-3 group-hover:bg-white group-hover:border-slate-200 transition-all shadow-sm">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Liquid Valuation</span>
           <div className="flex items-center justify-between">
-            <span className="text-2xl font-mono font-black text-slate-900 tracking-tighter">£{latestVal.toLocaleString()}</span>
+            <span className="text-2xl font-mono font-black text-slate-900 tracking-tighter">₹{latestVal.toLocaleString()}</span>
             <div className={cn(
               "px-3 py-1.5 rounded-xl flex items-center gap-1.5 border shadow-sm",
               growth >= 0 ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"
@@ -128,7 +128,7 @@ export default function NetWorthProjection({ data, loading = false }: NetWorthPr
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Growth Objective</span>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-mono font-black text-blue-600 tracking-tighter">£{targetVal.toLocaleString()}</span>
+            <span className="text-2xl font-mono font-black text-blue-600 tracking-tighter">₹{targetVal.toLocaleString()}</span>
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest opacity-60">AI Suggested</span>
           </div>
         </div>

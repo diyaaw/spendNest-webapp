@@ -7,7 +7,7 @@ import { Shield, Target, ChevronDown, CheckCircle2, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const fmt = (n: number) => {
-  return '£' + Math.round(n).toLocaleString('en-GB');
+  return '₹' + Math.round(n).toLocaleString('en-IN');
 };
 
 const EXPRESS = process.env.NEXT_PUBLIC_API_URL!;
@@ -163,7 +163,7 @@ export default function EmergencyFundTracker() {
       <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 hover:border-blue-600/20 transition-all mt-6 shadow-inner">
         <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Liquid Reserves</p>
         <div className="flex items-center gap-3">
-          <span className="text-2xl font-light text-slate-300 font-mono">£</span>
+          <span className="text-2xl font-light text-slate-300 font-mono">₹</span>
           {editingSavings ? (
             <input type="number" value={savingsInput} autoFocus
               onChange={(e) => setSavingsInput(e.target.value)}
@@ -171,7 +171,7 @@ export default function EmergencyFundTracker() {
           ) : (
             <button onClick={() => setEditingSavings(true)}
               className="flex-1 text-left text-2xl font-black text-slate-900 hover:text-blue-600 transition-all font-mono tracking-tighter leading-none">
-              {Number(savingsInput) > 0 ? Math.round(Number(savingsInput)).toLocaleString('en-GB') : "0"}
+              {Number(savingsInput) > 0 ? Math.round(Number(savingsInput)).toLocaleString('en-IN') : "0"}
             </button>
           )}
           <button 

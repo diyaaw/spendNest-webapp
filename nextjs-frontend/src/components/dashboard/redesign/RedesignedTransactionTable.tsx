@@ -196,13 +196,13 @@ export function RedesignedTransactionTable({ transactions = [], limit }: { trans
                             "text-sm font-mono font-black tracking-tighter",
                             type === 'income' ? "text-emerald-600" : "text-slate-900"
                           )}>
-                            {type === 'income' ? '+' : '-'}£{Math.abs(amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            {type === 'income' ? '+' : '-'}₹{Math.abs(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
 
                         <div className="col-span-3 sm:col-span-2 flex items-center justify-end">
                            <span className="text-sm font-mono font-black tracking-tighter text-slate-400 group-hover:text-slate-900 transition-colors">
-                             £{balance.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                             ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                            </span>
                         </div>
                       </motion.div>

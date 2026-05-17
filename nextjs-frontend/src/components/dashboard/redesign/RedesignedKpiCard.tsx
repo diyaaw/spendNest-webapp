@@ -29,7 +29,7 @@ export default function RedesignedKpiCard({
   isOverdraft,
   subtext
 }: KpiProps) {
-  const formattedAmount = Math.abs(amount).toLocaleString('en-GB', {
+  const formattedAmount = Math.abs(amount).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -87,7 +87,7 @@ export default function RedesignedKpiCard({
               isHero ? "text-2xl" : "text-xl",
               isHighlight ? "text-blue-400" : "text-slate-300"
             )}>
-              £
+              ₹
             </span>
             <span className={cn(
               "font-black tracking-tighter leading-none block",

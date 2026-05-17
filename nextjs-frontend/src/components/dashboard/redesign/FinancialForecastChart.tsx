@@ -68,10 +68,10 @@ export default function FinancialForecastChart({ data, loading = false }: Financ
               fontWeight={700}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(value) => `£${value.toLocaleString()}`} 
+              tickFormatter={(value) => `₹${value.toLocaleString()}`} 
             />
             <Tooltip 
-              formatter={(value: any) => [`£${value.toLocaleString()}`, '']}
+              formatter={(value: any) => [`₹${value.toLocaleString()}`, '']}
               contentStyle={{ 
                 backgroundColor: '#0F172A', 
                 border: 'none', 
@@ -116,7 +116,7 @@ export default function FinancialForecastChart({ data, loading = false }: Financ
             </div>
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Target Next Month</span>
           </div>
-          <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">£{nextPrediction.toLocaleString()}</span>
+          <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">₹{nextPrediction.toLocaleString()}</span>
         </div>
 
         {showWarning && (
