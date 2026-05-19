@@ -90,7 +90,7 @@ const uploadStatement = async (req, res, next) => {
 
     return {
       userId,
-      date:        tx.date ? new Date(tx.date) : new Date(),
+      date:        tx.date ? new Date(tx.date) : null,
       description: tx.description || '',
       amount,
       balance:     typeof tx.balance === 'number' ? tx.balance : 0,
@@ -102,6 +102,12 @@ const uploadStatement = async (req, res, next) => {
       uploadBatch: uploadId,
       bank,
     };
+  }).filter((doc) => {
+    if (!doc || !doc.date || isNaN(doc.date.getTime())) return false;
+    const cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() + 1);
+    if (doc.date > cutoff) {       console.warn('[Upload] Skipping future-dated tx (likely mis-parsed 2-digit year): ' + doc.description); return false; }
+    return true;
   });
 
   const rec   = mlResult.recommendation   || {};

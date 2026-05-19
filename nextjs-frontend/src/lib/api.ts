@@ -116,20 +116,24 @@ const normalizeForecast = (raw: any): any => {
 
 /**
  * Normalize the backend ledger response to the recommendation shape the frontend expects.
+ * DB shape:     { totalIncome, totalExpenses, availableToSpend, saveRate, emergencyBuffer, monthlyBurn }
+ * Memory shape: { safe_to_spend, reserved_funds, emergency_buffer, message, ... }
  */
 const normalizeLedger = (raw: any, forecast: any): any => {
   if (!raw) return null;
-  // Already has the message field (from in-memory) — return as-is
+  // Already has the message field (from in-memory) - return as-is
   if (raw.message !== undefined) return raw;
   const reserved = raw.reserved_funds ?? raw.quarantinedForTaxes ?? 0;
+  // current_balance from DB ledger: totalIncome - totalExpenses (formula-based, matches backend)
+  const currentBal = (raw.totalIncome ?? 0) - (raw.totalExpenses ?? 0);
   return {
     safe_to_spend:            raw.safe_to_spend ?? raw.availableToSpend ?? 0,
     reserved_funds:           reserved,
     emergency_buffer:         raw.emergency_buffer ?? raw.emergencyBuffer ?? 0,
     recommended_reserve_rate: raw.recommended_reserve_rate ?? raw.saveRate ?? 0.10,
     monthly_burn:             raw.monthly_burn ?? raw.monthlyBurn ?? 0,
-    message: `Keep ₹${Math.round(reserved).toLocaleString('en-IN')} reserved for taxes & emergencies.`,
-    current_balance:  (raw.totalIncome ?? 0) - (raw.totalExpenses ?? 0),
+    message: `Keep \u20b9${Math.round(reserved).toLocaleString('en-IN')} reserved for taxes & emergencies.`,
+    current_balance:  currentBal,
     predicted_income: forecast?.predicted_income ?? 0,
   };
 };

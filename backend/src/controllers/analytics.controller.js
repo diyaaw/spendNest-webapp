@@ -6,6 +6,90 @@ const { UploadStore } = require('../services/sharedStore');
 
 const { isDbConnected } = require('../config/db');  // shared singleton  never define locally
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CENTRALIZED ACCOUNTING HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+// RULE: Classification is TYPE-based, not sign-based.
+//   income   = type === 'income'   (amount may be positive OR negative in CSV)
+//   expense  = type === 'expense'  (amount may be positive OR negative in CSV)
+// Both always use Math.abs(amount) so sign mismatches don't cause ₹0 results.
+// ─────────────────────────────────────────────────────────────────────────
+
+const normAmt = (t) => Math.abs(Number(t.amount) || 0);
+
+/** Sum income transactions (type-based, sign-agnostic). */
+const calcIncome = (txList) => {
+  let total = 0;
+  txList.forEach((t) => {
+    const rawType = t.type || t.category || '';
+    const type = rawType.toLowerCase().trim();
+    if (type === 'income') {
+      total += normAmt(t);
+    }
+  });
+  return total;
+};
+
+/** Sum expense transactions (type-based, sign-agnostic). */
+const calcExpenses = (txList) => {
+  let total = 0;
+  txList.forEach((t) => {
+    const rawType = t.type || t.category || '';
+    const type = rawType.toLowerCase().trim();
+    if (type === 'expense') {
+      total += normAmt(t);
+    }
+  });
+  return total;
+};
+
+/** Net savings = income - expenses. */
+const calcSavings = (txList) => calcIncome(txList) - calcExpenses(txList);
+
+/**
+ * Deduplicate a transaction array by _id / transactionId.
+ * Prevents double-counting when in-memory uploads are concatenated.
+ */
+const deduplicateTx = (txList) => {
+  const seen = new Set();
+  return txList.filter((t) => {
+    const key = String(t._id || t.transactionId || t.date + '|' + (t.amount || 0) + '|' + (t.description || ''));
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+/**
+ * Emit diagnostic summary to the backend console.
+ * @param {string}   label  — e.g. "getSummary", "getMonthlyAnalytics"
+ * @param {object[]} txList — deduplicated, future-date-cleaned array
+ */
+const logAccountingDiagnostics = (label, txList) => {
+  const income   = calcIncome(txList);
+  const expenses = calcExpenses(txList);
+  const savings  = income - expenses;
+  const expTxCount = txList.filter((t) => (t.type || t.category || '').trim().toLowerCase() === 'expense').length;
+  console.log(
+    `[${label}] txns=${txList.length} | income=₹${Math.round(income).toLocaleString()} ` +
+    `| expenses=₹${Math.round(expenses).toLocaleString()} (${expTxCount} rows) ` +
+    `| savings=₹${Math.round(savings).toLocaleString()}`
+  );
+  if (expenses === 0 && expTxCount > 0) {
+    console.warn(
+      `[${label}] ⚠️  expenses=₹0 but ${expTxCount} expense-typed rows exist — ` +
+      `possible sign-based filter bug.`
+    );
+  }
+  if (income > 0 && savings > income * 1.5) {
+    console.warn(
+      `[${label}] ⚠️  savings (₹${Math.round(savings)}) > 1.5× income — ` +
+      `possible duplicate aggregation.`
+    );
+  }
+};
+
+
 // ─── Shared filter builder ────────────────────────────────────────────────────
 const txFilter = (userId, uploadBatch) => {
   const filter = { userId };
@@ -13,26 +97,34 @@ const txFilter = (userId, uploadBatch) => {
   return filter;
 };
 
-// ─── GET /api/analytics/summary ───────────────────────────────────────────────
+// ─── GET /api/analytics/summary ───────────────────────────────────────────────// ✅ GET /api/analytics/summary ✅
 /**
  * Returns overall financial metrics.
  *
- * Rules (enforced here AND in ML service):
- *   income   = SUM(amount) WHERE type == 'income' AND amount > 0
- *   expenses = SUM(ABS(amount)) WHERE type == 'expense' AND amount < 0
- *   balance  = latestTransaction.balance (NEVER manually summed)
+ * Rules:
+ *   income          = SUM(amount) WHERE type == 'income' AND amount > 0
+ *   expenses        = SUM(ABS(amount)) WHERE type == 'expense' AND amount < 0
+ *   latest_balance  = total_income - total_expenses  (Opening Balance + Income - Expenses)
+ *   csv_balance     = last non-zero value in the CSV balance column (reference only)
  */
 const getSummary = async (req, res, next) => {
   try {
     const { uploadId } = req.query;
     const userId = req.user.id || req.user._id;
-
     let transactions = [];
     let mlSummary = null;
     let mlCurrentMonth = null;
+    let mlRecommendation = null;
 
     if (isDbConnected()) {
       transactions = await Transaction.find(txFilter(userId, uploadId)).sort({ date: 1 });
+      const ledger = await Ledger.findOne({ userId }).sort({ month: -1 });
+      if (ledger) {
+        mlRecommendation = {
+          reserved_funds: ledger.quarantinedForTaxes,
+          emergency_buffer: ledger.emergencyBuffer
+        };
+      }
     }
 
     // Fallback to In-Memory
@@ -44,6 +136,7 @@ const getSummary = async (req, res, next) => {
           transactions = target.txDocs;
           mlSummary = target.summary;
           mlCurrentMonth = target.currentMonth;
+          mlRecommendation = target.recommendation;
         }
       } else {
         // Aggregate ALL
@@ -58,61 +151,63 @@ const getSummary = async (req, res, next) => {
     }
 
     // ── Sort by date (required for correct balance extraction and month math) ──
-    const sorted = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const sorted = [...transactions]
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // ── Available Balance: last non-zero balance in sorted list ───────────────
-    // Rule: NEVER sum balances. NEVER derive from income - expenses.
-    const txWithBalance = sorted.filter((t) => t.balance != null && t.balance !== 0);
-    const latestBalance = txWithBalance.length > 0
+    // ── Future-date guard ────────────────────────────────────────────────
+    // Transactions dated more than 365 days from now are almost certainly
+    // mis-parsed 2-digit years from Indian bank CSVs ("09/09/27" → 2027).
+    // Strip them so they cannot corrupt datasetLatestDate or cmLabel.
+    const uploadCutoff = new Date();
+    uploadCutoff.setFullYear(uploadCutoff.getFullYear() + 1);
+    const validSorted = sorted.filter((t) => new Date(t.date) <= uploadCutoff);
+
+    if (validSorted.length < sorted.length) {
+      console.warn(
+        `⚠️  [getSummary] Future-date guard removed ${sorted.length - validSorted.length} transaction(s) ` +
+        `with dates beyond ${uploadCutoff.toISOString().slice(0, 10)}. ` +
+        `These are likely mis-parsed 2-digit years from the uploaded CSV.`
+      );
+    }
+
+    // Use the validated set for all subsequent calculations
+    const cleanSorted = deduplicateTx(validSorted.length > 0 ? validSorted : sorted);
+    logAccountingDiagnostics('getSummary', cleanSorted);
+
+    // ── CSV running balance ─ preserved for overdraft detection / debugging only ──
+    const txWithBalance = cleanSorted.filter((t) => t.balance != null && t.balance !== 0);
+    const csvBalance = txWithBalance.length > 0
       ? txWithBalance[txWithBalance.length - 1].balance
-      : 0;
+      : null;
 
     // ── Determine the "active" month window for KPI cards ─────────────────────
-    // Use the current calendar month. If no data exists for it (historical CSV),
-    // fall back to the latest month present in the dataset.
-    const now = new Date();
-    const matchesMonth = (dt, ref) =>
-      dt.getMonth() === ref.getMonth() && dt.getFullYear() === ref.getFullYear();
+    // RULE: ALWAYS use the latest month present in the DATASET.
+    const datasetLatestDate = new Date(cleanSorted[cleanSorted.length - 1].date);
+    const startOfDatasetMonth = new Date(datasetLatestDate.getFullYear(), datasetLatestDate.getMonth(), 1);
 
-    const currentMonthTx = sorted.filter((t) => matchesMonth(new Date(t.date), now));
-    const activeTx = currentMonthTx.length > 0
-      ? currentMonthTx
-      : (() => {
-          const latestDate = new Date(sorted[sorted.length - 1].date);
-          return sorted.filter((t) => matchesMonth(new Date(t.date), latestDate));
-        })();
+    let cmIncome = 0;
+    let cmExpenses = 0;
 
-    // ── Current-month income & expenses ──────────────────────────────────────
-    // Priority: ML pre-computed > derived from activeTx
-    let cmIncome, cmExpenses;
-
-    if (mlCurrentMonth && mlCurrentMonth.income != null) {
-      cmIncome   = Number(mlCurrentMonth.income)   || 0;
-      cmExpenses = Number(mlCurrentMonth.expenses)  || 0;
-    } else {
-      // income = positive-amount income-typed rows
-      cmIncome = activeTx
-        .filter((t) => t.amount > 0 && t.type === 'income')
-        .reduce((s, t) => s + t.amount, 0);
-
-      // Fallback: no explicit income type — use all positive-amount rows
-      if (cmIncome === 0) {
-        cmIncome = activeTx
-          .filter((t) => t.amount > 0)
-          .reduce((s, t) => s + t.amount, 0);
+    cleanSorted.forEach((t) => {
+      const tDate = new Date(t.date);
+      if (tDate >= startOfDatasetMonth && tDate <= datasetLatestDate) {
+        const rawType = t.type || t.category || '';
+        const type = rawType.toLowerCase().trim();
+        
+        if (type === 'income') {
+          cmIncome += normAmt(t);
+        }
+        
+        if (type === 'expense') {
+          cmExpenses += normAmt(t);
+        }
       }
-
-      // expenses = ABS of all negative-amount rows
-      cmExpenses = activeTx
-        .filter((t) => t.amount < 0)
-        .reduce((s, t) => s + Math.abs(t.amount), 0);
-    }
+    });
 
     const cmSavings = cmIncome - cmExpenses;
 
-    // Human-readable label for the active month
-    const refDate = activeTx.length > 0 ? new Date(activeTx[0].date) : now;
-    const cmLabel = refDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    // Human-readable label — reflects the dataset's latest month
+    const cmLabel = datasetLatestDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
     // ── All-time totals ───────────────────────────────────────────────────────
     let allTimeIncome, allTimeExpenses;
@@ -121,28 +216,58 @@ const getSummary = async (req, res, next) => {
       allTimeIncome   = Number(mlSummary.total_income)   || 0;
       allTimeExpenses = Number(mlSummary.total_expenses)  || 0;
     } else {
-      allTimeIncome = sorted
-        .filter((t) => t.type === 'income' && t.amount > 0)
-        .reduce((s, t) => s + t.amount, 0);
-
-      allTimeExpenses = sorted
-        .filter((t) => t.type === 'expense' && t.amount < 0)
-        .reduce((s, t) => s + Math.abs(t.amount), 0);
+      // Type-based, sign-agnostic — works for positive-expense datasets too
+      allTimeIncome   = calcIncome(cleanSorted);
+      allTimeExpenses = calcExpenses(cleanSorted);
     }
 
     const r = (n) => Math.round(n * 100) / 100;
 
+    // ✅ Net Period Balance = Total Income - Total Expenses - Tax Buffer - Savings Buffer ✅
+    const taxBuffer = (mlRecommendation && mlRecommendation.reserved_funds) ? Number(mlRecommendation.reserved_funds) : 0;
+    const savingsBuffer = (mlRecommendation && mlRecommendation.emergency_buffer) ? Number(mlRecommendation.emergency_buffer) : 0;
+
+    const formulaBalance = allTimeIncome - allTimeExpenses;
+    
+    // Applying the user requested formula
+    const finalBalance = allTimeIncome - allTimeExpenses - taxBuffer - savingsBuffer;
+
+    // 🔍 Sanity guard: log a warning if CSV balance deviates > 150% from formula
+    if (csvBalance !== null && allTimeIncome > 0) {
+      const deviation = Math.abs(csvBalance - finalBalance) / allTimeIncome;
+      if (deviation > 1.5) {
+        console.warn(
+          `⚠️  [getSummary] Balance discrepancy — CSV: ${r(csvBalance)}, ` +
+          `Formula: ${r(finalBalance)}, deviation ${Math.round(deviation * 100)}% > 150%. `
+        );
+      }
+    }
+
+    // 🚩 Suspicious balance guard ─────────────────────────────────────────────
+    // Flag when the balance exceeds 1.5× total income.
+    const flagSuspiciousBalance = allTimeIncome > 0 && finalBalance > allTimeIncome * 1.5;
+    if (flagSuspiciousBalance) {
+      console.warn(
+        `⚠️  [getSummary] Suspicious balance: finalBalance (${r(finalBalance)}) ` +
+        `> 1.5 × total_income (${r(allTimeIncome * 1.5)}). ` +
+        `Possible causes: imported opening balance, retained earnings, sign error.`
+      );
+    }
+
     return res.json({
-      // ── All-time totals (for annual tax card, health score, etc.) ─────────
+      // ✅ All-time totals ✅
       total_income:         r(allTimeIncome),
       total_expenses:       r(allTimeExpenses),
-      total_savings:        r(allTimeIncome - allTimeExpenses),
-      latest_balance:       r(latestBalance),
-      total_transactions:   sorted.length,
-      income_transactions:  sorted.filter((t) => t.type === 'income').length,
-      expense_transactions: sorted.filter((t) => t.type === 'expense').length,
+      total_savings:        r(formulaBalance),    // strictly income - expenses
+      latest_balance:       r(finalBalance),      // exact CSV balance
+      csv_balance:          csvBalance !== null ? r(csvBalance) : null,
+      // 🚩 True when balance looks unrealistically high vs income
+      balance_suspicious:   flagSuspiciousBalance,
+      total_transactions:   cleanSorted.length,
+      income_transactions:  cleanSorted.filter((t) => t.type === 'income').length,
+      expense_transactions: cleanSorted.filter((t) => t.type === 'expense').length,
 
-      // ── Current-month metrics (KPI cards MUST read from here, not totals) ─
+      // ✅ Current-month metrics (KPI cards MUST read from here, not totals) ✅
       current_month: {
         income:   r(cmIncome),
         expenses: r(cmExpenses),
@@ -182,23 +307,24 @@ const getMonthlyAnalytics = async (req, res, next) => {
 
     if (!transactions.length) return res.json([]);
 
+    // Future-date guard: strip transactions > 365 days ahead
+    const monthlyCutoff = new Date();
+    monthlyCutoff.setFullYear(monthlyCutoff.getFullYear() + 1);
+    const cleanTx = transactions.filter((t) => new Date(t.date) <= monthlyCutoff);
+
     // Group by month — filter each group independently
     const monthMap = {};
-    transactions.forEach((t) => {
+    cleanTx.forEach((t) => {
       const d = new Date(t.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 
       if (!monthMap[key]) monthMap[key] = { key, month: label, income: 0, expenses: 0 };
 
-      // Income: only positive-amount income rows
-      if (t.type === 'income' && t.amount > 0) {
-        monthMap[key].income += t.amount;
-      }
-      // Expenses: only negative-amount expense rows
-      if (t.type === 'expense' && t.amount < 0) {
-        monthMap[key].expenses += Math.abs(t.amount);
-      }
+      // Type-based, sign-agnostic accounting
+      const amt = normAmt(t);
+      if ((t.type || t.category || '').trim().toLowerCase() === 'income')  monthMap[key].income   += amt;
+      if ((t.type || t.category || '').trim().toLowerCase() === 'expense') monthMap[key].expenses += amt;
     });
 
     const result = Object.values(monthMap)
@@ -223,10 +349,10 @@ const getCategoryBreakdown = async (req, res, next) => {
     const userId = req.user.id || req.user._id;
 
     if (isDbConnected()) {
+      // Type-based: match expense rows regardless of sign
       const filter = {
         ...txFilter(userId, uploadId),
         type: 'expense',
-        amount: { $lt: 0 },
       };
       const result = await Transaction.aggregate([
         { $match: filter },
@@ -251,10 +377,10 @@ const getCategoryBreakdown = async (req, res, next) => {
     if (allTx.length) {
       const catMap = {};
       allTx
-        .filter((t) => t.type === 'expense' && t.amount < 0)
+        .filter((t) => (t.type || t.category || '').trim().toLowerCase() === 'expense')
         .forEach((t) => {
           const cat = t.category || 'Other';
-          catMap[cat] = (catMap[cat] || 0) + Math.abs(t.amount);
+          catMap[cat] = (catMap[cat] || 0) + normAmt(t);
         });
       const result = Object.entries(catMap)
         .map(([name, value]) => ({
@@ -286,8 +412,7 @@ const getForecast = async (req, res, next) => {
         if (historicalIncome.length === 0) {
           const txs = await Transaction.find({
             userId,
-            type: 'income',
-            amount: { $gt: 0 },
+            type: 'income',  // type-based: no sign filter needed
           }).sort({ date: 1 });
 
           const monthMap = {};
@@ -296,7 +421,7 @@ const getForecast = async (req, res, next) => {
               month: 'short',
               year: 'numeric',
             });
-            monthMap[key] = (monthMap[key] || 0) + t.amount;
+            monthMap[key] = (monthMap[key] || 0) + normAmt(t);
           });
           historicalIncome = Object.entries(monthMap).map(([month, income]) => ({
             month,
@@ -541,8 +666,10 @@ const getCashflow = async (req, res, next) => {
 
       if (!monthMap[key]) monthMap[key] = { key, month: label, income: 0, expenses: 0 };
 
-      if (t.type === 'income' && t.amount > 0)  monthMap[key].income   += t.amount;
-      if (t.type === 'expense' && t.amount < 0) monthMap[key].expenses += Math.abs(t.amount);
+      // Type-based, sign-agnostic
+      const camt = normAmt(t);
+      if ((t.type || t.category || '').trim().toLowerCase() === 'income')  monthMap[key].income   += camt;
+      if ((t.type || t.category || '').trim().toLowerCase() === 'expense') monthMap[key].expenses += camt;
     });
 
     const cashflow = Object.values(monthMap)

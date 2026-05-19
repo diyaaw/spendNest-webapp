@@ -14,6 +14,8 @@ interface KpiProps {
   isHighlight?: boolean;
   isHero?: boolean;
   isOverdraft?: boolean;
+  /** Deficit state: expenses > income this period. Shows amber badge, hides trend badge. */
+  isDeficit?: boolean;
   subtext?: string;
 }
 
@@ -27,6 +29,7 @@ export default function RedesignedKpiCard({
   isHighlight,
   isHero,
   isOverdraft,
+  isDeficit,
   subtext
 }: KpiProps) {
   const formattedAmount = Math.abs(amount).toLocaleString('en-IN', {
@@ -47,7 +50,13 @@ export default function RedesignedKpiCard({
       {/* Background patterns for premium feel */}
       {isHighlight && (
         <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} />
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `radial-gradient(circle at 2px 2px, ${isDeficit ? '#f59e0b' : 'white'} 1px, transparent 0)`,
+              backgroundSize: '24px 24px'
+            }}
+          />
         </div>
       )}
 
@@ -67,7 +76,8 @@ export default function RedesignedKpiCard({
               {title}
             </span>
           </div>
-          {trend && (
+          {/* Trend badge — hidden in deficit mode */}
+          {trend && !isDeficit && (
             <div className={cn(
               "flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
               trend === 'up' 
@@ -76,6 +86,13 @@ export default function RedesignedKpiCard({
             )}>
               {trend === 'up' ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
               {trendLabel}
+            </div>
+          )}
+          {/* Deficit badge */}
+          {isDeficit && (
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-amber-500/15 text-amber-400 border-amber-500/25">
+              <ArrowDownRight size={10} />
+              Deficit Month
             </div>
           )}
         </div>

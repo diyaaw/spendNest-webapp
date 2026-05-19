@@ -101,6 +101,21 @@ function RedesignedDashboardContent() {
   const cmSavings = cm?.savings ?? (cmIncome - cmExpenses);
   const savingsRate = cmIncome > 0 ? Math.round((cmSavings / cmIncome) * 100) : 0;
 
+  /**
+   * getDatasetMonthLabel — single source of truth for the month label.
+   * ALWAYS reads from the backend-provided dataset label.
+   * NEVER generates a label from new Date() or browser clock.
+   * Fallback: "No Dataset Month" (never a system date).
+   */
+  const cmLabel: string = summary?.current_month?.label ?? 'No Dataset Month';
+
+  // Deficit state: net savings negative OR safe_to_spend clamped to 0 while expenses exist
+  const safeToSpend = data.recommendation?.safe_to_spend ?? 0;
+  const isDeficit = safeToSpend === 0 && (latestBalance <= 0 || cmSavings < 0 || (data.recommendation?.status === 'low_balance'));
+
+  // Suspicious balance: backend flagged balance > 1.5× total income
+  const balanceSuspicious: boolean = summary?.balance_suspicious ?? false;
+
   // 1. Map Forecast Data
   const forecastChartPoints = [
     ...(forecast?.historical_income || []).map(h => ({ month: h.month, actual: h.income, predicted: null })),
@@ -119,13 +134,13 @@ function RedesignedDashboardContent() {
     color: colors[i % colors.length]
   }));
 
-  // 3. Map Net Worth Projection (Cumulative balance per month)
-  let runningBalance = latestBalance;
-  const netWorthPoints = [...(monthly || [])].reverse().map((m, i) => {
-    const point = { month: m.month, netWorth: runningBalance };
-    runningBalance -= (m.income - m.expenses);
-    return point;
-  }).reverse();
+  // 3. Net Worth Projection — cumulative savings, forward chronological order
+  // Starts from 0 at the beginning of the CSV period and accumulates net savings per month.
+  let cumulativeNet = 0;
+  const netWorthPoints = (monthly || []).map((m) => {
+    cumulativeNet += (m.income - m.expenses);
+    return { month: m.month, netWorth: Math.round(cumulativeNet * 100) / 100 };
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24 overflow-x-hidden">
@@ -162,24 +177,43 @@ function RedesignedDashboardContent() {
         
         {/* ── 2. HERO SECTION ───────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 flex flex-col gap-2">
             <RedesignedKpiCard 
-              title="Available Balance"
+              title="Net Period Balance"
               amount={latestBalance}
               isOverdraft={isOverdraft}
-              subtext={isOverdraft ? "Account Overdrawn" : "Current Liquidity"}
+              subtext={
+                isOverdraft
+                  ? "Account Overdrawn"
+                  : "Income − Expenses − Tax Buffer − Savings Buffer"
+              }
               icon={<Wallet size={20} />}
             />
+            {/* Suspicious balance warning badge */}
+            {balanceSuspicious && !isOverdraft && (
+              <div className="flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl">
+                <span className="text-amber-500 text-sm mt-0.5 flex-shrink-0">⚠️</span>
+                <p className="text-[10px] font-bold text-amber-700 leading-relaxed">
+                  <span className="font-black uppercase tracking-wide">Unverified Balance</span><br />
+                  This figure exceeds 1.5× your total income. It may include an imported opening balance, retained earnings from prior periods, or a data classification issue. Treat with caution.
+                </p>
+              </div>
+            )}
           </div>
           <div className="lg:col-span-2">
             <RedesignedKpiCard 
               title="Safe-to-Spend"
-              amount={data.recommendation?.safe_to_spend ?? 0}
+              amount={safeToSpend}
               isHighlight
               isHero
-              subtext="Optimized limit after covering bills & goals"
+              isDeficit={isDeficit}
+              subtext={
+                isDeficit
+                  ? "Expenses exceed income — no surplus available"
+                  : "Optimized limit after covering bills & goals"
+              }
               icon={<BrainCircuit size={24} />}
-              trend="up"
+              trend={isDeficit ? undefined : "up"}
               trendLabel="AI Recommendation"
             />
           </div>
@@ -188,30 +222,34 @@ function RedesignedDashboardContent() {
         {/* ── 3. MONTHLY PERFORMANCE ─────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <RedesignedKpiCard 
-            title="Income"
+            title={`${cmLabel} · Income`}
             amount={cmIncome}
             icon={<ArrowUpRight size={18} className="text-emerald-500" />}
-            subtext={cm?.label || "This Month"}
+            subtext="Monthly total income"
           />
           <RedesignedKpiCard 
-            title="Expenses"
+            title={`${cmLabel} · Expenses`}
             amount={cmExpenses}
             icon={<ArrowDownRight size={18} className="text-rose-500" />}
-            subtext={cm?.label || "This Month"}
+            subtext="Monthly total expenses"
           />
           <RedesignedKpiCard 
-            title="Net Savings"
+            title={`${cmLabel} · Savings`}
             amount={Math.abs(cmSavings)}
             isNegative={cmSavings < 0}
             trend={cmSavings >= 0 ? "up" : "down"}
             trendLabel={cmSavings >= 0 ? `${savingsRate}% saved` : "Overspending"}
-            subtext="Cash Surplus"
+            subtext={cmSavings < 0 ? "Deficit this month" : "Net cash surplus"}
           />
           <RedesignedKpiCard 
             title="AI Forecast"
             amount={forecast?.predicted_income ?? 0}
             icon={<TrendingUp size={18} className="text-blue-500" />}
-            subtext="Predicted next month"
+            subtext={
+              forecast?.is_expense_forecast
+                ? "Net cash flow forecast (no income data)"
+                : (forecast?.forecast_basis ?? "Predicted next month income")
+            }
           />
         </div>
 

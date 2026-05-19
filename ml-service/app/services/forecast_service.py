@@ -82,23 +82,51 @@ def _get_monthly_income(df: pd.DataFrame) -> pd.DataFrame:
     if temp.empty:
         return pd.DataFrame(columns=["month_period", "month_label", "income"])
 
+    # Normalize type strings before all comparisons
+    temp["type"] = temp["type"].astype(str).str.lower().str.strip()
     temp["month_period"] = temp["date"].dt.to_period("M")
 
-    # Tier 1: strict income rows
-    income_mask = temp.apply(_is_income_row, axis=1)
-    income_df = temp[income_mask & (temp["amount"] > 0)]
+    # Tier 1a: explicitly typed income rows (type-based, sign-agnostic)
+    typed_income_mask = temp["type"] == "income"
+    # Tier 1b: keyword-based income rows (salary, payroll, etc.)
+    kw_income_mask    = temp.apply(_is_income_row, axis=1)
+    # Tier 1 = union of both (prefer typed, supplement with keyword matches)
+    income_mask = typed_income_mask | kw_income_mask
+    tier1_df = temp[income_mask].copy()
+    # Tier 2: all non-expense rows (sign-agnostic fallback)
+    tier2_df  = temp[temp["type"] != "expense"].copy()
 
-    fallback_tier = None
-    if income_df.empty:
-        # Tier 2: all positive rows
-        income_df = temp[temp["amount"] > 0]
+    # Normalise amounts to absolute values for summation
+    tier1_total = float(tier1_df["amount"].abs().sum()) if not tier1_df.empty else 0.0
+    tier2_total = float(tier2_df["amount"].abs().sum()) if not tier2_df.empty else 0.0
+
+    # Coverage check: if Tier 1 captures < 60% of all-positive income, fall back to Tier 2.
+    # This prevents the forecast from diverging from the monthly income KPI card
+    # (e.g. Monthly Income = Rs7,079 but AI Forecast shows Rs3,635).
+    if tier1_total > 0 and tier2_total > 0 and (tier1_total / tier2_total) < 0.60:
+        logger.warning(
+            "Tier 1 income (%.2f) covers only %.0f%% of all-positive income (%.2f). "
+            "Falling back to Tier 2 for consistency with monthly KPI.",
+            tier1_total, (tier1_total / tier2_total) * 100, tier2_total
+        )
+        income_df     = tier2_df
+        fallback_tier = "positive_only_coverage"
+    elif not tier1_df.empty:
+        income_df     = tier1_df
+        fallback_tier = None          # strict income -- preferred
+    elif not tier2_df.empty:
+        income_df     = tier2_df      # Tier 1 found nothing at all
         fallback_tier = "positive_only"
-        if not income_df.empty:
-            logger.info("📊 Tier 2 fallback: using all positive-amount rows for forecast")
+        logger.info("Tier 2 fallback: using all positive-amount rows for forecast")
+    else:
+        return pd.DataFrame(columns=["month_period", "month_label", "income", "forecast_tier"])
 
     if income_df.empty:
-        return pd.DataFrame(columns=["month_period", "month_label", "income"])
+        return pd.DataFrame(columns=["month_period", "month_label", "income", "forecast_tier"])
 
+    # Use abs() when summing so mixed-sign CSVs don't cancel out
+    income_df = income_df.copy()
+    income_df["amount"] = income_df["amount"].abs()
     monthly = (
         income_df
         .groupby("month_period")["amount"]
@@ -106,15 +134,16 @@ def _get_monthly_income(df: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
         .sort_values("month_period")
     )
-    monthly["month_label"] = monthly["month_period"].dt.strftime("%b %Y")
+    monthly["month_label"]   = monthly["month_period"].dt.strftime("%b %Y")
     monthly.rename(columns={"amount": "income"}, inplace=True)
+    monthly["forecast_tier"] = "income_strict" if fallback_tier is None else fallback_tier
 
+    tier_label = "income_strict" if fallback_tier is None else fallback_tier
     logger.info(
-        "📅 Monthly income series: %d data points | Tier: %s",
-        len(monthly),
-        "income_strict" if fallback_tier is None else fallback_tier
+        "Monthly income series: %d pts | Tier: %s | Total: %.2f",
+        len(monthly), tier_label, float(monthly["income"].sum())
     )
-    return monthly[["month_period", "month_label", "income"]]
+    return monthly[["month_period", "month_label", "income", "forecast_tier"]]
 
 
 def _compute_volatility(series: np.ndarray) -> dict:
@@ -359,6 +388,11 @@ def get_income_forecast(df: pd.DataFrame) -> dict:
         return _empty_forecast()
 
     series = monthly_df["income"].values.astype(float)
+    # Which tier was used (all rows share the same value)
+    forecast_tier = (
+        monthly_df["forecast_tier"].iloc[0]
+        if "forecast_tier" in monthly_df.columns else "income_strict"
+    )
     n = len(series)
 
     # ── Labels ────────────────────────────────────────────────────────────────
@@ -448,6 +482,13 @@ def get_income_forecast(df: pd.DataFrame) -> dict:
         "volatility":           volatility,
         "buffer_recommendation": buffer_recommendation,
         "insights":             insights,
+        # Which income tier the forecast was built from
+        "forecast_tier":        forecast_tier,
+        "forecast_basis":       (
+            "Predicted income (salary/payroll transactions)"
+            if forecast_tier == "income_strict" else
+            "Predicted income (all positive transactions)"
+        ),
     }
 
 

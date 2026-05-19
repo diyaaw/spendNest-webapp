@@ -173,9 +173,15 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
     df = raw_df.copy()
 
     # ── Step 1: Normalize column headers ────────────────────────────────────
+    # Strip whitespace from column names (handles "Transaction Type " trailing spaces)
     df.columns = df.columns.str.strip()
     cols = df.columns.tolist()
-    logger.info("📋 Raw columns detected: %s", cols)
+    logger.info("Raw columns detected: %s", cols)
+
+    # Also make a lowercase view of column names for case-insensitive matching
+    # This does NOT modify df.columns — it is only used for _find_column lookups
+    cols_lower = [c.lower() for c in cols]
+    logger.info("Lowercase column names: %s", cols_lower)
 
     # ── Detect amount_single FIRST (exact match only) ──────────────────────
     # This prevents a column named "amount" from leaking into debit/credit
@@ -229,17 +235,41 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
 
     # ── Step 2: DATE ─────────────────────────────────────────────────────────
     if date_col:
-        # Try standard parsing first (letting pandas infer ISO vs other)
-        dates = pd.to_datetime(df[date_col], errors="coerce")
-        
-        # If too many failures, try with dayfirst=True for DD-MM formats
+        raw_date_series = df[date_col].astype(str).str.strip()
+
+        # Indian bank statements always use DD/MM/YYYY or DD-MM-YYYY.
+        # Try dayfirst=True FIRST so "03/09/25" correctly parses as Sep 3 2025
+        # rather than Mar 9 2025 (the pandas default / US format).
+        dates = pd.to_datetime(raw_date_series, errors="coerce", dayfirst=True)
+
+        # If that still fails for the majority, try the ISO / US default
         if dates.isna().sum() > (len(dates) / 2):
-            dates = pd.to_datetime(df[date_col], errors="coerce", dayfirst=True)
-            
+            logger.warning(
+                "dayfirst=True left %.0f%% NaT — retrying with dayfirst=False",
+                100 * dates.isna().sum() / max(len(dates), 1),
+            )
+            dates = pd.to_datetime(raw_date_series, errors="coerce", dayfirst=False)
+
+        # ── Future-date guard ────────────────────────────────────────────────
+        # Any date parsed more than 365 days in the future is almost certainly
+        # a 2-digit-year mis-parse (e.g. "09/09/27" read as 2027 instead of 2025)
+        # or a corrupted field. Discard them (NaT) so they do not corrupt the
+        # dataset's latest-month label.
+        cutoff = pd.Timestamp.now() + pd.DateOffset(days=365)
+        future_mask = dates > cutoff
+        if future_mask.any():
+            logger.warning(
+                "Future-date guard: %d/%d dates exceed cutoff (%s) — clamping to NaT. "
+                "Samples: %s",
+                future_mask.sum(), len(dates), cutoff.strftime("%Y-%m-%d"),
+                raw_date_series[future_mask].head(5).tolist(),
+            )
+            dates = dates.where(~future_mask, other=pd.NaT)
+
         out["date"] = dates
     else:
-        logger.warning("⚠️  No date column found — filling with current date")
-        out["date"] = pd.Timestamp.now()
+        logger.warning("No date column found — rows will be dropped at dropna step")
+        out["date"] = pd.NaT  # safer than Timestamp.now(): rows get dropped instead of misdated
 
     # ── Step 3: DESCRIPTION ──────────────────────────────────────────────────
     if desc_col:
@@ -344,10 +374,15 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
                 valid_mask = valid_mask & (col_vals != "")
                 valid_count = max(valid_mask.sum(), 1)
                 
-                hit_rate = col_vals.isin(["credit", "debit", "cr", "dr"]).sum() / valid_count
+                ALL_TX_TYPE_WORDS = [
+                    "credit", "debit", "cr", "dr",
+                    "income", "expense",
+                    "deposit", "withdrawal", "payment", "purchase", "receipt",
+                ]
+                hit_rate = col_vals.isin(ALL_TX_TYPE_WORDS).sum() / valid_count
                 if hit_rate >= 0.3:
                     type_flag_col = col
-                    logger.info("🏷️  Type-flag column detected: '%s' (hit rate: %.0f%%)", col, hit_rate * 100)
+                    logger.info("Type-flag column detected: '%s' (hit rate: %.0f%%)", col, hit_rate * 100)
                     break
         if type_flag_col:
             break
@@ -356,7 +391,7 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
         type_vals = df[type_flag_col].astype(str).str.strip().str.lower()
         
         # Expanded keyword list for better detection
-        DEBIT_KEYWORDS = ["debit", "dr", "withdrawal", "payment", "wdr", "dr amt", "out", "expense"]
+        DEBIT_KEYWORDS = ["debit", "dr", "withdrawal", "payment", "wdr", "dr amt", "out", "expense", "purchase", "bill"]
         CREDIT_KEYWORDS = ["credit", "cr", "deposit", "receipt", "dep", "cr amt", "in", "income"]
         
         is_debit = type_vals.isin(DEBIT_KEYWORDS)
@@ -373,12 +408,47 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
         if "credit" in out.columns:
             out["credit"] = out["amount"].abs().where(is_credit, out["credit"])
         
-        logger.info("✅ Applied type-flag sign correction (debit rows: %d, credit rows: %d)", is_debit.sum(), is_credit.sum())
+        logger.info("Applied type-flag sign correction (debit rows: %d, credit rows: %d)", is_debit.sum(), is_credit.sum())
+
+        # ── Direct type assignment from type_flag_col ────────────────────────
+        # Set out["type"] DIRECTLY from the type column values — more robust
+        # than relying on amount sign alone. Works even when amounts are
+        # all-positive (common in Indian bank CSVs with a Type/Dr-Cr column).
+        DIRECT_INCOME_VALS  = {
+            "income", "credit", "cr", "deposit", "receipt", "dep",
+            "in", "salary", "cr amt",
+        }
+        DIRECT_EXPENSE_VALS = {
+            "expense", "debit", "dr", "withdrawal", "payment", "out",
+            "purchase", "wdr", "dr amt", "bill",
+        }
+        type_vals_direct = df[type_flag_col].astype(str).str.strip().str.lower()
+        direct_income_rows  = type_vals_direct.isin(DIRECT_INCOME_VALS)
+        direct_expense_rows = type_vals_direct.isin(DIRECT_EXPENSE_VALS)
+
+        # Initialise type as "transfer" (default for unknown values)
+        out["type"] = "transfer"
+        out.loc[direct_income_rows,  "type"] = "income"
+        out.loc[direct_expense_rows, "type"] = "expense"
+        logger.info(
+            "Direct type assignment from '%s': income=%d | expense=%d | unresolved=%d",
+            type_flag_col, direct_income_rows.sum(), direct_expense_rows.sum(),
+            (~direct_income_rows & ~direct_expense_rows).sum()
+        )
 
     # ── Step 6: TYPE ─────────────────────────────────────────────────────────
-    out["type"] = out["amount"].apply(
-        lambda x: "income" if x > 0 else ("expense" if x < 0 else "transfer")
-    )
+    # If type_flag_col set the type directly, only gap-fill unresolved rows.
+    # Otherwise (no type_flag_col), derive type from amount sign for every row.
+    if "type" not in out.columns:
+        out["type"] = out["amount"].apply(
+            lambda x: "income" if x > 0 else ("expense" if x < 0 else "transfer")
+        )
+    else:
+        gap_mask = out["type"] == "transfer"
+        out.loc[gap_mask, "type"] = out.loc[gap_mask, "amount"].apply(
+            lambda x: "income" if x > 0 else ("expense" if x < 0 else "transfer")
+        )
+        logger.info("Step 6 gap-fill: %d unresolved rows typed from amount sign", gap_mask.sum())
 
 
     # ── Step 7: Drop junk rows ───────────────────────────────────────────────

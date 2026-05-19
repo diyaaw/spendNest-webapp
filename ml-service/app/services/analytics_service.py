@@ -4,18 +4,18 @@ analytics_service.py
 Production-grade analytics engine for SpendNest.
 
 All calculations follow these invariants:
-  - Income  = SUM(amount) WHERE amount > 0 AND type == 'income'
-  - Expenses = SUM(ABS(amount)) WHERE amount < 0 AND type == 'expense'
-  - Balance  = latest non-zero value in the 'balance' column (never manually summed)
-  - Monthly metrics are always filtered by exact month/year — never cumulative
+  - income          = SUM(amount) WHERE amount > 0 AND type == 'income'
+  - expenses        = SUM(ABS(amount)) WHERE amount < 0 AND type == 'expense'
+  - latest_balance  = total_income - total_expenses  (Opening Balance + Income - Expenses)
+  - csv_balance     = last non-zero value in the balance column (reference only)
+  - Monthly metrics are always filtered by exact month/year - never cumulative
 
-Anomaly detection uses per-category z-score with a 2.5σ threshold.
+Anomaly detection uses per-category z-score with a 2.5-sigma threshold.
 """
 
 import logging
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
 
 logger = logging.getLogger("spendnest.ml.analytics")
 
@@ -27,15 +27,17 @@ def get_summary(df: pd.DataFrame) -> dict:
     Calculates overall financial metrics from the full transaction history.
 
     Rules:
-      - income  = SUM of positive amounts where type == 'income'
-      - expenses = SUM of ABS(negative amounts) where type == 'expense'
-      - balance  = latest non-zero 'balance' column value (NOT manually summed)
+      - income         = SUM of positive amounts where type == 'income'
+      - expenses       = SUM of ABS(negative amounts) where type == 'expense'
+      - latest_balance = total_income - total_expenses  (formula-based, not CSV column)
+      - csv_balance    = last non-zero balance column value (reference only)
     """
     empty = {
         "total_income": 0.0,
         "total_expenses": 0.0,
         "total_savings": 0.0,
         "latest_balance": 0.0,
+        "csv_balance": None,
         "total_transactions": 0,
         "income_transactions": 0,
         "expense_transactions": 0,
@@ -44,18 +46,24 @@ def get_summary(df: pd.DataFrame) -> dict:
     if df is None or df.empty:
         return empty
 
-    # Income: only positive-amount rows typed as 'income'
-    income_rows = df[(df["type"] == "income") & (df["amount"] > 0)]
-    total_income = float(income_rows["amount"].sum())
+    # Normalize type strings (handles 'Income', 'INCOME', 'income', leading/trailing whitespace)
+    if "type" in df.columns:
+        df = df.copy()
+        df["type"] = df["type"].astype(str).str.lower().str.strip()
 
-    # Expenses: only negative-amount rows typed as 'expense'
-    expense_rows = df[(df["type"] == "expense") & (df["amount"] < 0)]
+    # Type-based, sign-agnostic: abs() works for both positive-expense and negative-expense CSVs
+    income_rows  = df[df["type"] == "income"]
+    expense_rows = df[df["type"] == "expense"]
+    total_income   = float(income_rows["amount"].abs().sum())
     total_expenses = float(expense_rows["amount"].abs().sum())
 
     total_savings = total_income - total_expenses
 
-    # Balance: use the running balance column — NEVER compute from sums
-    latest_balance = 0.0
+    # Available Balance = Opening Balance (0) + Income - Expenses
+    available_balance = total_savings
+
+    # CSV running balance - preserved for overdraft detection / debugging only
+    csv_balance = None
     if "balance" in df.columns:
         valid_balances = df[df["balance"] != 0.0]["balance"].dropna()
         if not valid_balances.empty:
@@ -63,23 +71,44 @@ def get_summary(df: pd.DataFrame) -> dict:
             if "date" in df.columns:
                 df_sorted = df.sort_values("date")
                 bal_col = df_sorted[df_sorted["balance"] != 0.0]["balance"].dropna()
-                if not bal_col.empty:
-                    latest_balance = float(bal_col.iloc[-1])
-                else:
-                    latest_balance = float(valid_balances.iloc[-1])
+                csv_balance = float(bal_col.iloc[-1]) if not bal_col.empty else float(valid_balances.iloc[-1])
             else:
-                latest_balance = float(valid_balances.iloc[-1])
+                csv_balance = float(valid_balances.iloc[-1])
+
+    # Sanity guard: warn if CSV balance deviates > 150% from formula
+    if csv_balance is not None and total_income > 0:
+        deviation = abs(csv_balance - available_balance) / total_income
+        if deviation > 1.5:
+            logger.warning(
+                "⚠️  Balance discrepancy — CSV: %.2f, Formula: %.2f, deviation %.0f%% > 150%%. "
+                "Using formula value as latest_balance.",
+                csv_balance, available_balance, deviation * 100
+            )
 
     logger.info(
-        "📊 Summary → income: %.2f | expenses: %.2f | savings: %.2f | balance: %.2f | rows: %d",
-        total_income, total_expenses, total_savings, latest_balance, len(df)
+        "📊 Summary → income: %.2f | expenses: %.2f | available_balance: %.2f | csv_balance: %s | rows: %d",
+        total_income, total_expenses, available_balance,
+        f"{csv_balance:.2f}" if csv_balance is not None else "N/A", len(df)
     )
+
+    # 🚩 Suspicious balance guard
+    # Flag when formula balance > 1.5× total income — possible imported opening
+    # balance, retained earnings from prior periods, or a sign/classification error.
+    balance_suspicious = bool(total_income > 0 and available_balance > total_income * 1.5)
+    if balance_suspicious:
+        logger.warning(
+            "\u26a0\ufe0f  Suspicious balance: %.2f > 1.5 \u00d7 total_income (%.2f). "
+            "Possible: imported opening balance, retained earnings, or sign error.",
+            available_balance, total_income * 1.5
+        )
 
     return {
         "total_income":         round(total_income, 2),
         "total_expenses":       round(total_expenses, 2),
         "total_savings":        round(total_savings, 2),
-        "latest_balance":       round(latest_balance, 2),
+        "latest_balance":       round(available_balance, 2),  # formula-based
+        "csv_balance":          round(csv_balance, 2) if csv_balance is not None else None,
+        "balance_suspicious":   balance_suspicious,
         "total_transactions":   int(len(df)),
         "income_transactions":  int(len(income_rows)),
         "expense_transactions": int(len(expense_rows)),
@@ -104,6 +133,8 @@ def get_monthly_analytics(df: pd.DataFrame) -> list:
     if temp.empty:
         return []
 
+    # Normalize type strings before all comparisons
+    temp["type"] = temp["type"].astype(str).str.lower().str.strip()
     temp["month_period"] = temp["date"].dt.to_period("M")
     temp["month_display"] = temp["date"].dt.strftime("%b %Y")
 
@@ -113,15 +144,9 @@ def get_monthly_analytics(df: pd.DataFrame) -> list:
     for period, group in temp.groupby("month_period"):
         month_name = period.strftime("%b %Y")
 
-        # Income: only positive amounts with type == 'income'
-        income = float(
-            group[(group["type"] == "income") & (group["amount"] > 0)]["amount"].sum()
-        )
-
-        # Expenses: only negative amounts with type == 'expense'
-        expenses = float(
-            group[(group["type"] == "expense") & (group["amount"] < 0)]["amount"].abs().sum()
-        )
+        # Type-based, sign-agnostic (abs handles positive-expense datasets)
+        income   = float(group[group["type"] == "income" ]["amount"].abs().sum())
+        expenses = float(group[group["type"] == "expense"]["amount"].abs().sum())
 
         savings = income - expenses
 
@@ -162,52 +187,50 @@ def get_current_month_metrics(df: pd.DataFrame) -> dict:
     if temp.empty:
         return empty
 
-    now = datetime.now()
+    # Normalize type strings before all comparisons
+    temp["type"] = temp["type"].astype(str).str.lower().str.strip()
+
+    # RULE: ALWAYS use the latest month present in the dataset for the label.
+    # NEVER use datetime.now() — the server clock does not reflect the CSV data.
+    latest_period = temp["date"].dt.to_period("M").max()
+    dataset_latest_label = latest_period.strftime("%B %Y")
+
     current_month_mask = (
-        (temp["date"].dt.year  == now.year) &
-        (temp["date"].dt.month == now.month)
+        (temp["date"].dt.year  == latest_period.year) &
+        (temp["date"].dt.month == latest_period.month)
     )
     current_month_df = temp[current_month_mask]
+    label = dataset_latest_label  # always dataset-driven, never datetime.now()
 
-    if current_month_df.empty:
-        # Fall back to the latest available month in the dataset
-        latest_period = temp["date"].dt.to_period("M").max()
-        current_month_df = temp[temp["date"].dt.to_period("M") == latest_period]
-        label = latest_period.strftime("%B %Y")
-    else:
-        label = now.strftime("%B %Y")
+    logger.info(
+        "Dataset label resolved: '%s' (latest period in data, server clock ignored)",
+        label,
+    )
 
     if current_month_df.empty:
         return empty
 
-    # ── Income: two-tier fallback ─────────────────────────────────────────────
-    # Tier 1: explicitly typed income rows
-    income = float(
-        current_month_df[
-            (current_month_df["type"] == "income") &
-            (current_month_df["amount"] > 0)
-        ]["amount"].sum()
-    )
+    # ── Income: type-based, sign-agnostic (Tier 1 = typed rows, Tier 2 = all non-expense) ──
+    income_rows_cm = current_month_df[current_month_df["type"] == "income"]
+    income = float(income_rows_cm["amount"].abs().sum())
 
-    # Tier 2: if no typed income found, use ALL positive-amount rows
-    # (handles misclassified salary/credit transactions from unknown CSV formats)
+    # Tier 2 fallback: if no typed income, use all non-expense rows with abs(amount) > 0
     if income == 0.0:
         income = float(
-            current_month_df[current_month_df["amount"] > 0]["amount"].sum()
+            current_month_df[current_month_df["type"] != "expense"]["amount"].abs().sum()
         )
 
-    # ── Expenses: only negative-amount rows ───────────────────────────────────
-    expenses = float(
-        current_month_df[
-            (current_month_df["type"] == "expense") &
-            (current_month_df["amount"] < 0)
-        ]["amount"].abs().sum()
-    )
+    # ── Expenses: type-based, sign-agnostic ───────────────────────────────────
+    expense_rows_cm = current_month_df[current_month_df["type"] == "expense"]
+    expenses = float(expense_rows_cm["amount"].abs().sum())
 
-    # Fallback: if no typed expense rows, use all negative-amount rows
-    if expenses == 0.0:
-        expenses = float(
-            current_month_df[current_month_df["amount"] < 0]["amount"].abs().sum()
+    # Validation guard: warn if both are 0 but rows exist
+    if income == 0.0 and expenses == 0.0 and not current_month_df.empty:
+        logger.warning(
+            "Both income and expenses are 0 for %s despite %d rows existing. "
+            "Type distribution: %s",
+            label, len(current_month_df),
+            current_month_df["type"].value_counts().to_dict()
         )
 
     logger.info(
@@ -232,7 +255,10 @@ def get_category_breakdown(df: pd.DataFrame) -> list:
     if df is None or df.empty or "category" not in df.columns:
         return []
 
-    expense_df = df[(df["type"] == "expense") & (df["amount"] < 0)]
+    # Type-based, sign-agnostic — handles positive-expense datasets
+    _df = df.copy()
+    _df["type"] = _df["type"].astype(str).str.lower().str.strip()
+    expense_df = _df[_df["type"] == "expense"]
     if expense_df.empty:
         return []
 
@@ -273,9 +299,12 @@ def detect_subscriptions(df: pd.DataFrame) -> list:
     temp["date"] = pd.to_datetime(temp["date"], errors="coerce")
     temp = temp.dropna(subset=["date"])
 
+    # Type-based, sign-agnostic — minimum abs(amount) >= 50 to filter micro-charges
+    temp["type"] = temp["type"].astype(str).str.lower().str.strip()
     expense_df = temp[
-        (temp["type"] == "expense") & (temp["amount"] < 0) & (temp["amount"].abs() >= 50)
+        (temp["type"] == "expense") & (temp["amount"].abs() >= 50)
     ].copy()
+    expense_df["amount"] = expense_df["amount"].abs()  # normalize to positive
 
     if expense_df.empty:
         return []

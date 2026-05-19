@@ -39,9 +39,11 @@ def get_recommendations(df: pd.DataFrame) -> dict:
     if df is None or df.empty:
         return _empty_recommendation()
 
-    # ── 1. Get current balance (from the balance column — NOT computed) ────────
+    # ── 1. Get available balance using formula: income - expenses ────────────────
+    # Uses the formula-based latest_balance (NOT the CSV running balance column),
+    # to prevent inflated safe-to-spend values from pre-period bank history.
     summary = get_summary(df)
-    current_balance = summary.get("latest_balance", 0.0)
+    current_balance = summary.get("latest_balance", 0.0)  # = income - expenses
 
     # ── 2. Compute average monthly burn (last 3 months of expenses) ───────────
     monthly = get_monthly_analytics(df)
