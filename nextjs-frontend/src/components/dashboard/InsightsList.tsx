@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 
 interface Props {
   insights: string[];
@@ -24,7 +24,7 @@ export default function InsightsList({ insights, trends }: Props) {
 
       <div className="grid gap-3">
         {insights.map((insight, i) => (
-          <motion.div
+          <m.div
             key={i}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
@@ -35,11 +35,11 @@ export default function InsightsList({ insights, trends }: Props) {
               <span className="text-xs">✨</span>
             </div>
             <p className="text-sm text-white/80 leading-relaxed">{insight}</p>
-          </motion.div>
+          </m.div>
         ))}
 
         {trends?.weekend_vs_weekday_pct !== undefined && Math.abs(trends.weekend_vs_weekday_pct) > 10 && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 hover:border-amber-500/20 transition-all group"
@@ -56,7 +56,7 @@ export default function InsightsList({ insights, trends }: Props) {
               </p>
               <p className="text-[11px] text-amber-400/60 mt-1 font-medium">Spending Pattern Detected</p>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </div>
     </div>

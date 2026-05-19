@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
 import { Activity, ChevronRight, PieChart as PieIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,8 @@ const COLORS = [
 ];
 
 export default function SpendingDNAChart({ data }: { data: any[] }) {
+  const prefersReducedMotion = typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
     
@@ -62,6 +64,8 @@ export default function SpendingDNAChart({ data }: { data: any[] }) {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
+                isAnimationActive={!prefersReducedMotion}
+                animationDuration={800}
                 data={chartData}
                 cx="50%"
                 cy="50%"
@@ -111,7 +115,7 @@ export default function SpendingDNAChart({ data }: { data: any[] }) {
         {/* Legend Section */}
         <div className="flex-1 w-full space-y-2">
           {chartData.slice(0, 6).map((item, index) => (
-            <motion.div 
+            <m.div 
               key={item.category} 
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0, transition: { delay: index * 0.05 } }}
@@ -139,7 +143,7 @@ export default function SpendingDNAChart({ data }: { data: any[] }) {
                 </div>
               </div>
               <ChevronRight size={10} className="text-slate-300 group-hover/item:text-blue-600 transition-all" />
-            </motion.div>
+            </m.div>
           ))}
         </div>
       </div>

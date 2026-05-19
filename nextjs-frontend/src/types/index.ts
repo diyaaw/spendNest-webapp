@@ -128,7 +128,7 @@ export interface Subscription {
 
 // ─── Emergency Fund ───────────────────────────────────────────────────────────
 export interface EmergencyFund {
-  monthly_burn:                float;
+  monthly_burn:                number;
   current_savings:             number;
   runway_months:               number;
   target_savings:              number;
@@ -173,7 +173,6 @@ export interface DashboardData {
   category:      CategoryBreakdown[];
   forecast:      Forecast | null;
   recommendation: Recommendation | null;
-  allTransactions: Transaction[];
   cashflow?:     CashflowMonth[];
   cashflowTrend?: 'improving' | 'declining' | 'stable';
   insights?:     AIInsight[];

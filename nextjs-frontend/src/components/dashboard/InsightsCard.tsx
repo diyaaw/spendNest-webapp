@@ -11,7 +11,7 @@ interface Props {
 
 export default function InsightsCard({ summary, categories, forecastInsights = [] }: Props) {
   const insights = useMemo(() => {
-    const list = [];
+    const list: any[] = [];
 
     // ── 1. AI Forecast Insights (PRIORITY) ──────────────────────────────────
     forecastInsights.forEach(msg => {

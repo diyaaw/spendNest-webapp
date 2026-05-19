@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { ShieldCheck, Info, BrainCircuit, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -44,7 +44,7 @@ export default function RedesignedHealthScore({ score }: HealthProps) {
         <div className="relative w-44 h-44 flex items-center justify-center">
           <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 120 120">
             <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(0,0,0,0.03)" strokeWidth="10" />
-            <motion.circle
+            <m.circle
               cx="60" cy="60" r={r} fill="none"
               stroke="url(#healthGradient)"
               strokeWidth="10"
@@ -62,13 +62,13 @@ export default function RedesignedHealthScore({ score }: HealthProps) {
             </defs>
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <motion.span 
+            <m.span 
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
               className="text-4xl font-black text-slate-900 tracking-tighter leading-none"
             >
               {numericScore}
-            </motion.span>
+            </m.span>
             <span className={cn("text-[10px] font-black uppercase tracking-widest mt-1", status.color)}>
               {status.label} {status.icon}
             </span>

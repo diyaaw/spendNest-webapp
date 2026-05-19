@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
 
@@ -38,7 +38,7 @@ export default function RedesignedKpiCard({
   });
 
   return (
-    <motion.div
+    <m.div
       whileHover={{ y: -4 }}
       className={cn(
         "relative overflow-hidden rounded-[2rem] p-6 transition-all duration-500 border",
@@ -129,6 +129,6 @@ export default function RedesignedKpiCard({
       {isHighlight && (
         <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-blue-500/20 blur-[60px] rounded-full pointer-events-none" />
       )}
-    </motion.div>
+    </m.div>
   );
 }

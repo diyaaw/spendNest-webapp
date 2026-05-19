@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Search, Tag, Filter, ReceiptText, ExternalLink, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -64,18 +64,18 @@ export function RedesignedTransactionTable({ transactions = [], limit }: { trans
              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
              <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Live Syncing</span>
           </div>
-          <motion.div
+          <m.div
             animate={{ rotate: isExpanded ? 180 : 0 }}
             className="text-slate-400 p-2 bg-slate-50 rounded-lg"
           >
             <ChevronDown size={18} />
-          </motion.div>
+          </m.div>
         </div>
       </div>
 
       <AnimatePresence>
         {isExpanded && (
-          <motion.div
+          <m.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -158,7 +158,7 @@ export function RedesignedTransactionTable({ transactions = [], limit }: { trans
                     const type = t.type || (amount > 0 ? 'income' : 'expense');
 
                     return (
-                      <motion.div 
+                      <m.div 
                         key={idx} 
                         whileHover={{ x: 4 }}
                         className="grid grid-cols-12 gap-4 p-4 rounded-xl bg-slate-50/30 hover:bg-white border border-transparent hover:border-slate-100 hover:shadow-lg transition-all group cursor-pointer"
@@ -205,7 +205,7 @@ export function RedesignedTransactionTable({ transactions = [], limit }: { trans
                              ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                            </span>
                         </div>
-                      </motion.div>
+                      </m.div>
                     );
                   })
                 )}
@@ -220,7 +220,7 @@ export function RedesignedTransactionTable({ transactions = [], limit }: { trans
                 </button>
               )}
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

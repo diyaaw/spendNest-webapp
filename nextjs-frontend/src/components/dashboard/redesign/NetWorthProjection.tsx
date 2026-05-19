@@ -14,6 +14,8 @@ interface NetWorthProjectionProps {
 }
 
 export default function NetWorthProjection({ data, loading = false }: NetWorthProjectionProps) {
+  const prefersReducedMotion = typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+
   if (loading || !data || data.length === 0) {
     return <div className="bg-white h-[400px] w-full animate-pulse rounded-[2.5rem] border border-slate-100" />;
   }
@@ -96,6 +98,8 @@ export default function NetWorthProjection({ data, loading = false }: NetWorthPr
               label={{ value: 'TARGET', fill: '#2563EB', fontSize: 8, position: 'right', fontWeight: '900', letterSpacing: '0.1em' }}
             />
             <Area 
+              isAnimationActive={!prefersReducedMotion}
+              animationDuration={800}
               type="monotone" 
               dataKey="netWorth" 
               stroke="#10B981" 

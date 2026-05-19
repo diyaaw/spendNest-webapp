@@ -30,7 +30,7 @@ function TransactionsContent() {
     );
   }
 
-  const transactions = data.allTransactions ?? (data as any).transactions ?? [];
+  const transactions = data.transactions ?? (data as any).allTransactions ?? [];
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">

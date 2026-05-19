@@ -1,18 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { MessageSquare, X, Sparkles, Send, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function RedesignedAiAdvisor() {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasBeenOpened, setHasBeenOpened] = useState(false);
 
   return (
     <div className="fixed bottom-8 right-8 z-50">
       <AnimatePresence>
         {isOpen && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.9, y: 20, transformOrigin: 'bottom right' }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -67,33 +68,36 @@ export function RedesignedAiAdvisor() {
                 </button>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
-      <motion.button
+      <m.button
         whileHover={{ scale: 1.05, y: -4 }}
         whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setHasBeenOpened(true);
+        }}
         className={cn(
           "relative p-6 rounded-[2rem] shadow-2xl transition-all duration-500",
           isOpen ? "bg-slate-900 text-white" : "bg-blue-600 text-white shadow-blue-200"
         )}
       >
-        <motion.div
+        <m.div
           animate={{ rotate: isOpen ? 90 : 0 }}
           transition={{ duration: 0.3 }}
         >
           {isOpen ? <X size={28} /> : <MessageSquare size={28} />}
-        </motion.div>
+        </m.div>
         
-        {!isOpen && (
+        {!isOpen && !hasBeenOpened && (
           <span className="absolute -top-1 -right-1 flex h-5 w-5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
             <span className="relative inline-flex rounded-full h-5 w-5 bg-white shadow-sm"></span>
           </span>
         )}
-      </motion.button>
+      </m.button>
     </div>
   );
 }

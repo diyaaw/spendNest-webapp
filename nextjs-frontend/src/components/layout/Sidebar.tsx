@@ -10,7 +10,7 @@ import {
   Settings, HelpCircle, ChevronDown, LayoutGrid
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 
 const mainMenu = [
   { href: '/dashboard', exact: true, label: 'Overview', icon: <LayoutGrid size={20} /> },
@@ -46,7 +46,7 @@ function NavLink({ item, pathname }: { item: any; pathname: string }) {
       </span>
       {item.label}
       {isActive && (
-        <motion.div 
+        <m.div 
           layoutId="sidebar-pill"
           className="absolute inset-0 bg-blue-500/5 rounded-xl -z-10"
           initial={false}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
 import { Shield, Target, ChevronDown, CheckCircle2, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -30,7 +30,7 @@ function RunwayGauge({ months, max = 12, color }: { months: number; max?: number
     <div className="relative w-44 h-44 mx-auto flex items-center justify-center">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
         <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(0,0,0,0.03)" strokeWidth="10" />
-        <motion.circle
+        <m.circle
           cx="60" cy="60" r={r} fill="none" stroke={color || '#2563EB'} strokeWidth="10" strokeLinecap="round"
           strokeDasharray={circ}
           initial={{ strokeDashoffset: circ }}
@@ -39,10 +39,10 @@ function RunwayGauge({ months, max = 12, color }: { months: number; max?: number
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
-        <motion.span className="text-4xl font-black text-slate-900 tracking-tighter leading-none"
+        <m.span className="text-4xl font-black text-slate-900 tracking-tighter leading-none"
           initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }}>
           {months}
-        </motion.span>
+        </m.span>
         <span className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">Months</span>
       </div>
     </div>
@@ -207,13 +207,13 @@ export default function EmergencyFundTracker() {
         </button>
         <AnimatePresence>
           {showScenarios && analysis && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+            <m.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
               <div className="mt-3 bg-slate-50 rounded-2xl p-3 border border-slate-50 space-y-0.5">
                 {analysis.scenarios.map((s) => (
                   <ScenarioRow key={s.label} label={s.label} runway={s.runway} riskLevel={s.riskLevel} />
                 ))}
               </div>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { fetchBudgets, setBudgetCategoryLimit } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { Target, Zap, AlertCircle, CheckCircle2, ChevronRight, Settings2 } from 'lucide-react';
@@ -75,7 +75,7 @@ export default function BudgetTracker({ categories }: { categories: { name: stri
           const isExceeded = pct >= 100;
 
           return (
-            <motion.div 
+            <m.div 
               key={cat.name} 
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0, transition: { delay: index * 0.05 } }}
@@ -131,7 +131,7 @@ export default function BudgetTracker({ categories }: { categories: { name: stri
                 </div>
               ) : (
                 <div className="h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                  <motion.div
+                  <m.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct || (limit === 0 ? 0 : 3)}%` }}
                     className={cn(
@@ -143,7 +143,7 @@ export default function BudgetTracker({ categories }: { categories: { name: stri
                   />
                 </div>
               )}
-            </motion.div>
+            </m.div>
           );
         })}
       </div>

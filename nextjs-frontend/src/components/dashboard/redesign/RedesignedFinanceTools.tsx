@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Shield, Calculator, ArrowUpCircle, Receipt, CheckCircle2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { estimateTax, TaxEstimate } from '@/lib/taxEngine';
@@ -36,7 +36,7 @@ export function RedesignedProgressCard({ title, current, goal, icon: Icon, color
       
       <div className="flex-1 flex flex-col justify-end space-y-3">
         <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-50">
-          <motion.div 
+          <m.div 
             initial={{ width: 0 }}
             animate={{ width: `${percentage}%` }}
             transition={{ duration: 1.5, ease: "circOut" }}
@@ -99,7 +99,7 @@ export function RedesignedTaxEstimator({ annualIncome, taxData }: { annualIncome
           
           <div className="space-y-2">
             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-50">
-              <motion.div 
+              <m.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${displayRate}%` }}
                 className="h-full bg-blue-600 rounded-full"
@@ -129,7 +129,7 @@ export function RedesignedTaxEstimator({ annualIncome, taxData }: { annualIncome
             </div>
           </div>
           <div className={cn("w-8 h-4 rounded-full relative transition-colors p-1", isFreelance ? "bg-blue-600" : "bg-slate-200")}>
-             <motion.div 
+             <m.div 
                animate={{ x: isFreelance ? 16 : 0 }}
                className="w-2 h-2 bg-white rounded-full shadow-md"
              />

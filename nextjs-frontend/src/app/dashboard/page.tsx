@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { useSpendNestStore } from '@/store/useSpendNestStore';
-import { fetchHealthScore, fetchTaxEstimate } from '@/lib/api';
+
 import { estimateTax } from '@/lib/taxEngine';
 
 // Redesigned Components
@@ -46,12 +46,25 @@ function DashboardSkeleton() {
 }
 
 function RedesignedDashboardContent() {
-  const { data, isHydrating, clearDashboardData, healthScore, setHealthScore } = useSpendNestStore();
+  const { data, isHydrating, clearDashboardData } = useSpendNestStore();
   const [taxData, setTaxData] = useState<any>(null);
+
+  // Compute health score synchronously from local data
+  const income = data?.summary?.total_income || 0;
+  const expenses = data?.summary?.total_expenses || 0;
+  const localSavingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+  
+  let localHealthScore = 0;
+  if (income > 0) {
+    if (localSavingsRate >= 30) localHealthScore = 90;
+    else if (localSavingsRate >= 20) localHealthScore = 75;
+    else if (localSavingsRate >= 10) localHealthScore = 55;
+    else if (localSavingsRate >= 0) localHealthScore = 30;
+    else localHealthScore = 10;
+  }
 
   useEffect(() => {
     if (!data) return;
-    fetchHealthScore().then(setHealthScore).catch(() => {});
     
     // Always calculate real estimate from local data as primary or fallback
     let annualIncome = data.summary?.total_income ? data.summary.total_income : 0;
@@ -63,17 +76,14 @@ function RedesignedDashboardContent() {
 
     const realEstimate = estimateTax(annualIncome, 'new');
     setTaxData(realEstimate);
-
-    // Optionally override with backend if available
-    fetchTaxEstimate().then(setTaxData).catch(() => {});
-  }, [data, setHealthScore]);
+  }, [data?.summary?.total_income]);
 
   if (isHydrating) return <DashboardSkeleton />;
 
   if (!data) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex flex-col items-center justify-center p-8">
-        <motion.div 
+        <m.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12 max-w-2xl"
@@ -84,7 +94,7 @@ function RedesignedDashboardContent() {
           <p className="text-slate-500 text-lg">
             Upload your bank statement and let our AI engine decode your spending DNA.
           </p>
-        </motion.div>
+        </m.div>
         <div className="w-full max-w-xl">
           <UploadZone />
         </div>
@@ -92,7 +102,7 @@ function RedesignedDashboardContent() {
     );
   }
 
-  const { summary, monthly, category, forecast, filename, allTransactions } = data;
+  const { summary, monthly, category, forecast, filename, transactions } = data;
   const cm = summary?.current_month;
   const latestBalance = summary?.latest_balance ?? 0;
   const isOverdraft = latestBalance < 0;
@@ -114,7 +124,7 @@ function RedesignedDashboardContent() {
   const isDeficit = safeToSpend === 0 && (latestBalance <= 0 || cmSavings < 0 || (data.recommendation?.status === 'low_balance'));
 
   // Suspicious balance: backend flagged balance > 1.5× total income
-  const balanceSuspicious: boolean = summary?.balance_suspicious ?? false;
+  const balanceSuspicious: boolean = (summary as any)?.balance_suspicious ?? false;
 
   // 1. Map Forecast Data
   const forecastChartPoints = [
@@ -248,7 +258,7 @@ function RedesignedDashboardContent() {
             subtext={
               forecast?.is_expense_forecast
                 ? "Net cash flow forecast (no income data)"
-                : (forecast?.forecast_basis ?? "Predicted next month income")
+                : ((forecast as any)?.forecast_basis ?? "Predicted next month income")
             }
           />
         </div>
@@ -270,7 +280,7 @@ function RedesignedDashboardContent() {
         {/* ── 5. FINANCIAL INTELLIGENCE GRID ─────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1">
-             <RedesignedHealthScore score={healthScore} />
+             <RedesignedHealthScore score={localHealthScore} />
           </div>
           <div className="lg:col-span-1">
              <RedesignedTaxEstimator annualIncome={taxData?.annualIncome ?? 0} taxData={taxData} />
@@ -289,43 +299,59 @@ function RedesignedDashboardContent() {
              <RedesignedSubscriptionTracker />
           </div>
           <div className="lg:col-span-2 space-y-8">
+             {/* ── AI Insights — real data from /api/analytics/insights ── */}
              <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm hover:shadow-xl transition-all flex flex-col justify-center">
                 <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">AI Insights</h3>
-                <div className="space-y-6">
-                  <div className="flex gap-4">
-                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 h-fit">
-                      <BrainCircuit size={18} />
-                    </div>
-                    <p className="text-xs text-slate-500 font-bold leading-relaxed opacity-80">
-                      You've spent <span className="text-slate-900">₹{(12400 / 100).toFixed(2)}</span> on Food & Drink this week. That's <span className="text-rose-500">15% higher</span> than your average.
+                <div className="space-y-5">
+                  {data.insights && data.insights.length > 0 ? (
+                    data.insights.slice(0, 2).map((insight: any, i: number) => (
+                      <div key={i} className="flex gap-4">
+                        <div className={`p-3 rounded-2xl h-fit flex-shrink-0 ${
+                          insight.type === 'positive' ? 'bg-emerald-50 text-emerald-600'
+                          : insight.type === 'warning' ? 'bg-rose-50 text-rose-500'
+                          : 'bg-blue-50 text-blue-600'
+                        }`}>
+                          {insight.type === 'positive' ? <TrendingUp size={18} /> : <BrainCircuit size={18} />}
+                        </div>
+                        <p className="text-xs text-slate-500 font-bold leading-relaxed">
+                          <span className="mr-1">{insight.icon}</span>{insight.message}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-400 font-bold text-center py-4 opacity-60">
+                      No insights available yet.
                     </p>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 h-fit">
-                      <TrendingUp size={18} />
-                    </div>
-                    <p className="text-xs text-slate-500 font-bold leading-relaxed opacity-80">
-                      Saving an additional <span className="text-slate-900">₹50.00</span> this month will complete your <span className="text-emerald-600">Emergency Fund</span> 2 months earlier.
-                    </p>
-                  </div>
+                  )}
                 </div>
              </div>
-             
-             {/* Dynamic Budget Summary */}
+
+             {/* ── Top Spending Categories — real data from /api/analytics/categories ── */}
              <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm hover:shadow-xl transition-all">
-                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">Budget Health</h3>
-                <div className="space-y-6">
-                  {['Shopping', 'Housing', 'Travel'].map((item, i) => (
-                    <div key={item} className="space-y-3">
-                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                        <span className="text-slate-400">{item}</span>
-                        <span className="text-slate-900 font-mono">₹{(80 + i*5).toLocaleString()} / ₹100</span>
+                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">Top Spending</h3>
+                <div className="space-y-5">
+                  {category && category.length > 0 ? (() => {
+                    const top = category.slice(0, 3);
+                    const maxVal = top[0]?.value || 1;
+                    return top.map((cat: any) => (
+                      <div key={cat.name} className="space-y-2">
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                          <span className="text-slate-400 truncate max-w-[130px]">{cat.name}</span>
+                          <span className="text-slate-900 font-mono">₹{Math.round(cat.value).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                          <div
+                            className="h-full bg-blue-600 rounded-full transition-all duration-700"
+                            style={{ width: `${Math.min(100, Math.round((cat.value / maxVal) * 100))}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                        <div className="h-full bg-blue-600 rounded-full" style={{ width: `${80 + i*5}%` }} />
-                      </div>
-                    </div>
-                  ))}
+                    ));
+                  })() : (
+                    <p className="text-xs text-slate-400 font-bold text-center py-4 opacity-60">
+                      No spending data yet.
+                    </p>
+                  )}
                 </div>
              </div>
           </div>
@@ -333,7 +359,7 @@ function RedesignedDashboardContent() {
 
         {/* ── 7. TRANSACTION TABLE ──────────────────────────── */}
         <div className="w-full">
-           <RedesignedTransactionTable transactions={allTransactions} limit={10} />
+           <RedesignedTransactionTable transactions={transactions} limit={10} />
         </div>
 
       </main>
@@ -341,10 +367,7 @@ function RedesignedDashboardContent() {
       {/* ── 8. PROACTIVE AI ADVISOR (FAB) ───────────────────── */}
       <RedesignedAiAdvisor />
 
-      <style jsx global>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { chatWithAI } from '@/lib/api';
 
 interface Message {
@@ -46,7 +46,7 @@ export default function FinancialAdvisor() {
   return (
     <>
       {/* Floating Toggle Button */}
-      <motion.button
+      <m.button
         onClick={() => setIsOpen(!isOpen)}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
@@ -56,12 +56,12 @@ export default function FinancialAdvisor() {
         <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-      </motion.button>
+      </m.button>
 
       {/* Chat Window */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -89,7 +89,7 @@ export default function FinancialAdvisor() {
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
               {messages.map((msg, i) => (
-                <motion.div
+                <m.div
                   key={i}
                   initial={{ opacity: 0, x: msg.isAi ? -10 : 10 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -102,7 +102,7 @@ export default function FinancialAdvisor() {
                   }`}>
                     {msg.text}
                   </div>
-                </motion.div>
+                </m.div>
               ))}
               {isLoading && (
                 <div className="flex justify-start">
@@ -138,7 +138,7 @@ export default function FinancialAdvisor() {
                 AI can make mistakes. Check important info.
               </p>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </>

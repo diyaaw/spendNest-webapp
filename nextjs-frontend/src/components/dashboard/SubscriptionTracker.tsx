@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { CURRENCY_SYMBOL } from '@/lib/utils';
 
 const fmt = (n: number) => CURRENCY_SYMBOL + Math.round(n).toLocaleString('en-IN');
@@ -117,7 +117,7 @@ function SubCard({ sub, onRemove }: { sub: Sub; onRemove: (uid: string, id?: str
     : 'bg-slate-50 text-slate-400 border border-slate-100';
 
   return (
-    <motion.div
+    <m.div
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
@@ -157,7 +157,7 @@ function SubCard({ sub, onRemove }: { sub: Sub; onRemove: (uid: string, id?: str
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -245,7 +245,7 @@ export default function SubscriptionTracker() {
       {/* Alert banner */}
       <AnimatePresence>
         {alert && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
@@ -253,7 +253,7 @@ export default function SubscriptionTracker() {
           >
             <span>{alert}</span>
             <button onClick={() => setAlert(null)} className="text-indigo-400 hover:text-indigo-600 ml-4">✕</button>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 

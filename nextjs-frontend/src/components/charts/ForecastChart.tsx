@@ -82,9 +82,9 @@ export default function ForecastChart({ forecastData }: { forecastData: Forecast
 
   // ── Stage badge ───────────────────────────────────────────────────────────
   const stageBadge =
-    stagesAvailable >= 6
+    (stagesAvailable ?? 0) >= 6
       ? { label: 'ARIMA Stage 3', color: 'bg-purple-100 text-purple-700 border-purple-200' }
-      : stagesAvailable >= 3
+      : (stagesAvailable ?? 0) >= 3
       ? { label: 'WMA Stage 2', color: 'bg-blue-100 text-blue-700 border-blue-200' }
       : { label: 'SMA Stage 1', color: 'bg-slate-100 text-slate-600 border-slate-200' };
 

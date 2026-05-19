@@ -8,6 +8,7 @@ import MobileNav from '@/components/layout/MobileNav';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSpendNestStore } from '@/store/useSpendNestStore';
 import { fetchDashboardData } from '@/lib/api';
+import { LazyMotion, domAnimation } from 'framer-motion';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -16,31 +17,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [authReady, setAuthReady] = useState(!!user);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       if (!user) {
         await fetchMe();
         const currentUser = useAuthStore.getState().user;
         if (!currentUser) {
-          router.replace('/login');
+          if (!cancelled) router.replace('/login');
           return;
         }
       }
 
-      setHydrating(true);
+      if (!cancelled) setHydrating(true);
       try {
         const data = await fetchDashboardData();
-        if (data && data.summary) {
+        if (!cancelled && data && data.summary) {
           setDashboardData(data);
         }
       } catch {
         // Fallback or ignore
       } finally {
-        setHydrating(false);
+        if (!cancelled) setHydrating(false);
       }
 
-      setAuthReady(true);
+      if (!cancelled) setAuthReady(true);
     })();
-  }, []);
+
+    return () => { cancelled = true; };
+  }, [user, fetchMe, router, setHydrating, setDashboardData]);
 
   if (!authReady && !user) {
     return (
@@ -54,7 +59,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <LazyMotion features={domAnimation}>
+      <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar />
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden pb-20 md:pb-0">
@@ -65,8 +71,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </main>
 
-      <MobileNav />
-    </div>
+        <MobileNav />
+      </div>
+    </LazyMotion>
   );
 }
 

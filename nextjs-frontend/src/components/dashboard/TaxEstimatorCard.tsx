@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { estimateTax, compareRegimes, getCurrentAdvanceTaxDue, fmt, type TaxEstimate, type TaxRegime } from '@/lib/taxEngine';
 import { Calculator, Shield, Info, ArrowRight, CheckCircle2, AlertTriangle, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -23,14 +23,14 @@ function QuarterRow({
   cumulative: number; totalTax: number; percentage: number; delay: number;
 }) {
   const now = new Date();
-  const [d, m] = dueDate.split(' ');
+  const [d, monthStr] = dueDate.split(' ');
   const months: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
-  const due = new Date(now.getFullYear(), months[m] ?? 0, parseInt(d));
+  const due = new Date(now.getFullYear(), months[monthStr] ?? 0, parseInt(d));
   const isPast = due < now;
   const isNext = !isPast && cumulative === totalTax ? false : !isPast;
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, x: -12 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay }}
@@ -62,7 +62,7 @@ function QuarterRow({
           </div>
         </div>
         <div className="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-50">
-          <motion.div
+          <m.div
             className={cn("h-full rounded-full", isPast ? 'bg-slate-300' : 'bg-emerald-500')}
             initial={{ width: 0 }}
             animate={{ width: progressWidth(cumulative, totalTax) }}
@@ -70,7 +70,7 @@ function QuarterRow({
           />
         </div>
       </div>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -181,7 +181,7 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
       {/* Dynamic Savings Alert */}
       <AnimatePresence mode="wait">
         {savings > 0 && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="p-6 bg-blue-50 border border-blue-100 rounded-3xl flex items-center justify-between shadow-sm"
@@ -205,14 +205,14 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
             >
               <ChevronDown className={cn("transition-transform duration-500", showComparison && "rotate-180")} />
             </button>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* Comparison Detail */}
       <AnimatePresence>
         {showComparison && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -231,7 +231,7 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
                 <span className="text-sm text-slate-600 font-black font-mono">{fmt(estimate.cess)}</span>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 

@@ -151,7 +151,7 @@ export const fetchDashboardData = async (uploadId?: string) => {
       tryFetchJson(`${EXPRESS}/api/analytics/categories${qs}`),
       tryFetchJson(`${EXPRESS}/api/analytics/forecast${qs}`),
       tryFetchJson(`${EXPRESS}/api/analytics/ledger${qs}`),
-      fetchJson(`${EXPRESS}/api/analytics/transactions${qs}${qs ? '&' : '?'}limit=10000`),
+      fetchJson(`${EXPRESS}/api/analytics/transactions${qs}${qs ? '&' : '?'}limit=50&page=1`),
       tryFetchJson(`${EXPRESS}/api/analytics/cashflow${qs}`),
       tryFetchJson(`${EXPRESS}/api/analytics/insights${qs}`),
     ]);
@@ -168,7 +168,7 @@ export const fetchDashboardData = async (uploadId?: string) => {
     cashflow:        cashflowRaw?.cashflow   ?? [],
     cashflowTrend:   cashflowRaw?.net_trend  ?? 'stable',
     insights:        insightsRaw?.insights   ?? [],
-    allTransactions: txResult?.transactions  ?? [],
+    transactions:    txResult?.transactions  ?? [],
   };
 };
 
@@ -250,3 +250,6 @@ export const setBudgetCategoryLimit = (category: string, budgetLimit: number, mo
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ category, budgetLimit, month }),
   });
+
+
+

@@ -4,56 +4,99 @@ const Forecast = require('../models/Forecast.model');
 const FinancialHealth = require('../models/FinancialHealth.model');
 const { UploadStore } = require('../services/sharedStore');
 
-const { isDbConnected } = require('../config/db');  // shared singleton  never define locally
+const { isDbConnected } = require('../config/db');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FIELD NORMALIZER
+// ═══════════════════════════════════════════════════════════════════════════
+// Handles CSV column name variants before any logic runs.
+// This is the single source of truth for field access — never read
+// t.amount, t.type, t.date directly anywhere else in this file.
+//
+//   CSV column      →  normalized field
+//   ─────────────────────────────────────
+//   Amount_INR      →  amount
+//   Amount / amount →  amount
+//   Type / type     →  type   (lowercased)
+//   Date / date     →  date
+//   Category        →  category
+//   Description     →  description
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns the numeric amount from a transaction object,
+ * checking all known column name variants. Always positive (abs).
+ */
+const normAmt = (t) => {
+  const raw =
+    t.Amount_INR ??   // Excel/CSV header variant
+    t.amount_inr ??   // lowercase variant
+    t.Amount ??   // generic capitalized
+    t.amount ??   // standard
+    0;
+  return Math.abs(Number(raw) || 0);
+};
+
+/**
+ * Returns the type string from a transaction object,
+ * normalized to lowercase. Checks all known column name variants.
+ */
+const normType = (t) => {
+  const raw = t.type || t.Type || t.category || t.Category || '';
+  return raw.toString().toLowerCase().trim();
+};
+
+/**
+ * Returns a valid Date object from a transaction,
+ * checking all known date column variants.
+ */
+const normDate = (t) => {
+  const raw = t.date || t.Date || null;
+  if (!raw) return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CENTRALIZED ACCOUNTING HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 // RULE: Classification is TYPE-based, not sign-based.
-//   income   = type === 'income'   (amount may be positive OR negative in CSV)
-//   expense  = type === 'expense'  (amount may be positive OR negative in CSV)
-// Both always use Math.abs(amount) so sign mismatches don't cause ₹0 results.
+//   income  = normType === 'income'
+//   expense = normType === 'expense'
+// Always uses normAmt() so column name mismatches don't silently produce ₹0.
 // ─────────────────────────────────────────────────────────────────────────
 
-const normAmt = (t) => Math.abs(Number(t.amount) || 0);
-
-/** Sum income transactions (type-based, sign-agnostic). */
 const calcIncome = (txList) => {
   let total = 0;
   txList.forEach((t) => {
-    const rawType = t.type || t.category || '';
-    const type = rawType.toLowerCase().trim();
-    if (type === 'income') {
-      total += normAmt(t);
-    }
+    if (normType(t) === 'income') total += normAmt(t);
   });
   return total;
 };
 
-/** Sum expense transactions (type-based, sign-agnostic). */
 const calcExpenses = (txList) => {
   let total = 0;
   txList.forEach((t) => {
-    const rawType = t.type || t.category || '';
-    const type = rawType.toLowerCase().trim();
-    if (type === 'expense') {
-      total += normAmt(t);
-    }
+    if (normType(t) === 'expense') total += normAmt(t);
   });
   return total;
 };
 
-/** Net savings = income - expenses. */
 const calcSavings = (txList) => calcIncome(txList) - calcExpenses(txList);
 
 /**
- * Deduplicate a transaction array by _id / transactionId.
+ * Deduplicate a transaction array by _id / transactionId / composite key.
  * Prevents double-counting when in-memory uploads are concatenated.
  */
 const deduplicateTx = (txList) => {
   const seen = new Set();
   return txList.filter((t) => {
-    const key = String(t._id || t.transactionId || t.date + '|' + (t.amount || 0) + '|' + (t.description || ''));
+    const d = normDate(t);
+    const key = String(
+      t._id ||
+      t.transactionId ||
+      `${d ? d.toISOString() : 'nodate'}|${normAmt(t)}|${t.description || t.Description || ''}`
+    );
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -62,23 +105,32 @@ const deduplicateTx = (txList) => {
 
 /**
  * Emit diagnostic summary to the backend console.
- * @param {string}   label  — e.g. "getSummary", "getMonthlyAnalytics"
- * @param {object[]} txList — deduplicated, future-date-cleaned array
  */
 const logAccountingDiagnostics = (label, txList) => {
-  const income   = calcIncome(txList);
+  const income = calcIncome(txList);
   const expenses = calcExpenses(txList);
-  const savings  = income - expenses;
-  const expTxCount = txList.filter((t) => (t.type || t.category || '').trim().toLowerCase() === 'expense').length;
+  const savings = income - expenses;
+  const expTxCount = txList.filter((t) => normType(t) === 'expense').length;
+  const incTxCount = txList.filter((t) => normType(t) === 'income').length;
+
   console.log(
-    `[${label}] txns=${txList.length} | income=₹${Math.round(income).toLocaleString()} ` +
-    `| expenses=₹${Math.round(expenses).toLocaleString()} (${expTxCount} rows) ` +
-    `| savings=₹${Math.round(savings).toLocaleString()}`
+    `[${label}] txns=${txList.length} (income=${incTxCount}, expense=${expTxCount}) | ` +
+    `income=₹${Math.round(income).toLocaleString()} | ` +
+    `expenses=₹${Math.round(expenses).toLocaleString()} | ` +
+    `savings=₹${Math.round(savings).toLocaleString()}`
   );
+
+  // Warn if amounts are suspiciously zero despite typed rows existing
   if (expenses === 0 && expTxCount > 0) {
     console.warn(
-      `[${label}] ⚠️  expenses=₹0 but ${expTxCount} expense-typed rows exist — ` +
-      `possible sign-based filter bug.`
+      `[${label}] ⚠️  expenses=₹0 but ${expTxCount} expense-typed rows exist. ` +
+      `Check that Amount_INR/amount column is being read correctly.`
+    );
+  }
+  if (income === 0 && incTxCount > 0) {
+    console.warn(
+      `[${label}] ⚠️  income=₹0 but ${incTxCount} income-typed rows exist. ` +
+      `Check that Amount_INR/amount column is being read correctly.`
     );
   }
   if (income > 0 && savings > income * 1.5) {
@@ -87,8 +139,23 @@ const logAccountingDiagnostics = (label, txList) => {
       `possible duplicate aggregation.`
     );
   }
-};
 
+  // Sample first 3 rows to help debug column mismatches in production
+  if ((income === 0 || expenses === 0) && txList.length > 0) {
+    console.warn(`[${label}] 🔍 First 3 raw txn objects for inspection:`);
+    txList.slice(0, 3).forEach((t, i) => {
+      console.warn(`  [${i}]`, JSON.stringify({
+        date: t.date || t.Date,
+        type: t.type || t.Type,
+        amount: t.amount,
+        Amount: t.Amount,
+        Amount_INR: t.Amount_INR,
+        normAmt: normAmt(t),
+        normType: normType(t),
+      }));
+    });
+  }
+};
 
 // ─── Shared filter builder ────────────────────────────────────────────────────
 const txFilter = (userId, uploadBatch) => {
@@ -97,23 +164,16 @@ const txFilter = (userId, uploadBatch) => {
   return filter;
 };
 
-// ─── GET /api/analytics/summary ───────────────────────────────────────────────// ✅ GET /api/analytics/summary ✅
-/**
- * Returns overall financial metrics.
- *
- * Rules:
- *   income          = SUM(amount) WHERE type == 'income' AND amount > 0
- *   expenses        = SUM(ABS(amount)) WHERE type == 'expense' AND amount < 0
- *   latest_balance  = total_income - total_expenses  (Opening Balance + Income - Expenses)
- *   csv_balance     = last non-zero value in the CSV balance column (reference only)
- */
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/analytics/summary
+// ═══════════════════════════════════════════════════════════════════════════
 const getSummary = async (req, res, next) => {
   try {
     const { uploadId } = req.query;
     const userId = req.user.id || req.user._id;
+
     let transactions = [];
     let mlSummary = null;
-    let mlCurrentMonth = null;
     let mlRecommendation = null;
 
     if (isDbConnected()) {
@@ -122,12 +182,12 @@ const getSummary = async (req, res, next) => {
       if (ledger) {
         mlRecommendation = {
           reserved_funds: ledger.quarantinedForTaxes,
-          emergency_buffer: ledger.emergencyBuffer
+          emergency_buffer: ledger.emergencyBuffer,
         };
       }
     }
 
-    // Fallback to In-Memory
+    // Fallback to in-memory
     if (!transactions.length) {
       const uploads = await UploadStore.findByUserId(userId);
       if (uploadId) {
@@ -135,14 +195,10 @@ const getSummary = async (req, res, next) => {
         if (target) {
           transactions = target.txDocs;
           mlSummary = target.summary;
-          mlCurrentMonth = target.currentMonth;
           mlRecommendation = target.recommendation;
         }
       } else {
-        // Aggregate ALL
         transactions = uploads.reduce((acc, u) => acc.concat(u.txDocs), []);
-        // For summary/currentMonth in aggregate view, we let the logic below re-calculate 
-        // because we don't have a pre-computed aggregate summary from ML yet
       }
     }
 
@@ -150,129 +206,126 @@ const getSummary = async (req, res, next) => {
       return res.status(404).json({ message: 'No data found. Please upload a CSV first.' });
     }
 
-    // ── Sort by date (required for correct balance extraction and month math) ──
-    const sorted = [...transactions]
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    // ── Sort by date ──────────────────────────────────────────────────────
+    const sorted = [...transactions].sort((a, b) => {
+      const da = normDate(a);
+      const db = normDate(b);
+      if (!da && !db) return 0;
+      if (!da) return -1;
+      if (!db) return 1;
+      return da - db;
+    });
 
-    // ── Future-date guard ────────────────────────────────────────────────
-    // Transactions dated more than 365 days from now are almost certainly
-    // mis-parsed 2-digit years from Indian bank CSVs ("09/09/27" → 2027).
-    // Strip them so they cannot corrupt datasetLatestDate or cmLabel.
-    const uploadCutoff = new Date();
-    uploadCutoff.setFullYear(uploadCutoff.getFullYear() + 1);
-    const validSorted = sorted.filter((t) => new Date(t.date) <= uploadCutoff);
+    // ── Future-date guard ─────────────────────────────────────────────────
+    // Transactions dated beyond Dec 31 of the current year are almost always
+    // mis-parsed 2-digit years from Indian bank CSVs (e.g. "27" → 2027).
+    const now = new Date();
+    const uploadCutoff = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-    if (validSorted.length < sorted.length) {
+    const validSorted = sorted.filter((t) => {
+      const d = normDate(t);
+      return d !== null && d <= uploadCutoff;
+    });
+
+    const invalidCount = sorted.length - validSorted.length;
+    if (invalidCount > 0) {
       console.warn(
-        `⚠️  [getSummary] Future-date guard removed ${sorted.length - validSorted.length} transaction(s) ` +
-        `with dates beyond ${uploadCutoff.toISOString().slice(0, 10)}. ` +
-        `These are likely mis-parsed 2-digit years from the uploaded CSV.`
+        `⚠️  [getSummary] Future-date guard removed ${invalidCount} transaction(s) ` +
+        `with dates beyond ${uploadCutoff.toISOString().slice(0, 10)} or unparseable dates.`
       );
     }
 
-    // Use the validated set for all subsequent calculations
     const cleanSorted = deduplicateTx(validSorted.length > 0 ? validSorted : sorted);
     logAccountingDiagnostics('getSummary', cleanSorted);
 
-    // ── CSV running balance ─ preserved for overdraft detection / debugging only ──
-    const txWithBalance = cleanSorted.filter((t) => t.balance != null && t.balance !== 0);
+    // ── CSV running balance (reference only) ──────────────────────────────
+    const txWithBalance = cleanSorted.filter((t) => {
+      const b = t.balance ?? t.Balance;
+      return b != null && Number(b) !== 0;
+    });
     const csvBalance = txWithBalance.length > 0
-      ? txWithBalance[txWithBalance.length - 1].balance
+      ? Number(txWithBalance[txWithBalance.length - 1].balance ?? txWithBalance[txWithBalance.length - 1].Balance)
       : null;
 
-    // ── Determine the "active" month window for KPI cards ─────────────────────
-    // RULE: ALWAYS use the latest month present in the DATASET.
-    const datasetLatestDate = new Date(cleanSorted[cleanSorted.length - 1].date);
-    const startOfDatasetMonth = new Date(datasetLatestDate.getFullYear(), datasetLatestDate.getMonth(), 1);
+    // ── Active month window: always use dataset's latest month ────────────
+    const datasetLatestDate = normDate(cleanSorted[cleanSorted.length - 1]);
+    const activeYear = datasetLatestDate.getFullYear();
+    const activeMonth = datasetLatestDate.getMonth(); // 0-indexed
+
+    const startOfDatasetMonth = new Date(activeYear, activeMonth, 1, 0, 0, 0, 0);
+    const endOfDatasetMonth = new Date(activeYear, activeMonth + 1, 0, 23, 59, 59, 999);
 
     let cmIncome = 0;
     let cmExpenses = 0;
 
     cleanSorted.forEach((t) => {
-      const tDate = new Date(t.date);
-      if (tDate >= startOfDatasetMonth && tDate <= datasetLatestDate) {
-        const rawType = t.type || t.category || '';
-        const type = rawType.toLowerCase().trim();
-        
-        if (type === 'income') {
-          cmIncome += normAmt(t);
-        }
-        
-        if (type === 'expense') {
-          cmExpenses += normAmt(t);
-        }
+      const tDate = normDate(t);
+      if (!tDate) return;
+      if (tDate >= startOfDatasetMonth && tDate <= endOfDatasetMonth) {
+        if (normType(t) === 'income') cmIncome += normAmt(t);
+        if (normType(t) === 'expense') cmExpenses += normAmt(t);
       }
     });
 
     const cmSavings = cmIncome - cmExpenses;
-
-    // Human-readable label — reflects the dataset's latest month
     const cmLabel = datasetLatestDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-    // ── All-time totals ───────────────────────────────────────────────────────
+    // ── All-time totals ───────────────────────────────────────────────────
     let allTimeIncome, allTimeExpenses;
 
-    if (mlSummary) {
-      allTimeIncome   = Number(mlSummary.total_income)   || 0;
-      allTimeExpenses = Number(mlSummary.total_expenses)  || 0;
+    if (mlSummary && Number(mlSummary.total_income) > 0) {
+      allTimeIncome = Number(mlSummary.total_income) || 0;
+      allTimeExpenses = Number(mlSummary.total_expenses) || 0;
     } else {
-      // Type-based, sign-agnostic — works for positive-expense datasets too
-      allTimeIncome   = calcIncome(cleanSorted);
+      allTimeIncome = calcIncome(cleanSorted);
       allTimeExpenses = calcExpenses(cleanSorted);
     }
 
     const r = (n) => Math.round(n * 100) / 100;
 
-    // ✅ Net Period Balance = Total Income - Total Expenses - Tax Buffer - Savings Buffer ✅
-    const taxBuffer = (mlRecommendation && mlRecommendation.reserved_funds) ? Number(mlRecommendation.reserved_funds) : 0;
-    const savingsBuffer = (mlRecommendation && mlRecommendation.emergency_buffer) ? Number(mlRecommendation.emergency_buffer) : 0;
+    const taxBuffer = mlRecommendation?.reserved_funds ? Number(mlRecommendation.reserved_funds) : 0;
+    const savingsBuffer = mlRecommendation?.emergency_buffer ? Number(mlRecommendation.emergency_buffer) : 0;
 
     const formulaBalance = allTimeIncome - allTimeExpenses;
-    
-    // Applying the user requested formula
     const finalBalance = allTimeIncome - allTimeExpenses - taxBuffer - savingsBuffer;
 
-    // 🔍 Sanity guard: log a warning if CSV balance deviates > 150% from formula
+    // Sanity guards
     if (csvBalance !== null && allTimeIncome > 0) {
       const deviation = Math.abs(csvBalance - finalBalance) / allTimeIncome;
       if (deviation > 1.5) {
         console.warn(
           `⚠️  [getSummary] Balance discrepancy — CSV: ${r(csvBalance)}, ` +
-          `Formula: ${r(finalBalance)}, deviation ${Math.round(deviation * 100)}% > 150%. `
+          `Formula: ${r(finalBalance)}, deviation ${Math.round(deviation * 100)}% > 150%.`
         );
       }
     }
 
-    // 🚩 Suspicious balance guard ─────────────────────────────────────────────
-    // Flag when the balance exceeds 1.5× total income.
     const flagSuspiciousBalance = allTimeIncome > 0 && finalBalance > allTimeIncome * 1.5;
     if (flagSuspiciousBalance) {
       console.warn(
         `⚠️  [getSummary] Suspicious balance: finalBalance (${r(finalBalance)}) ` +
-        `> 1.5 × total_income (${r(allTimeIncome * 1.5)}). ` +
-        `Possible causes: imported opening balance, retained earnings, sign error.`
+        `> 1.5 × total_income (${r(allTimeIncome * 1.5)}).`
       );
     }
 
     return res.json({
-      // ✅ All-time totals ✅
-      total_income:         r(allTimeIncome),
-      total_expenses:       r(allTimeExpenses),
-      total_savings:        r(formulaBalance),    // strictly income - expenses
-      latest_balance:       r(finalBalance),      // exact CSV balance
-      csv_balance:          csvBalance !== null ? r(csvBalance) : null,
-      // 🚩 True when balance looks unrealistically high vs income
-      balance_suspicious:   flagSuspiciousBalance,
-      total_transactions:   cleanSorted.length,
-      income_transactions:  cleanSorted.filter((t) => t.type === 'income').length,
-      expense_transactions: cleanSorted.filter((t) => t.type === 'expense').length,
+      // All-time totals
+      total_income: r(allTimeIncome),
+      total_expenses: r(allTimeExpenses),
+      total_savings: r(formulaBalance),
+      latest_balance: r(finalBalance),
+      csv_balance: csvBalance !== null ? r(csvBalance) : null,
+      balance_suspicious: flagSuspiciousBalance,
+      total_transactions: cleanSorted.length,
+      income_transactions: cleanSorted.filter((t) => normType(t) === 'income').length,
+      expense_transactions: cleanSorted.filter((t) => normType(t) === 'expense').length,
 
-      // ✅ Current-month metrics (KPI cards MUST read from here, not totals) ✅
+      // Current-month KPI cards — frontend MUST read from here, not totals
       current_month: {
-        income:   r(cmIncome),
+        income: r(cmIncome),
         expenses: r(cmExpenses),
-        savings:  r(cmSavings),
-        label:    cmLabel,
+        savings: r(cmSavings),
+        label: cmLabel,
       },
     });
   } catch (err) {
@@ -280,11 +333,9 @@ const getSummary = async (req, res, next) => {
   }
 };
 
-// ─── GET /api/analytics/monthly ───────────────────────────────────────────────
-/**
- * Returns per-month income/expense/savings.
- * Each month is always filtered in isolation — NEVER cumulative.
- */
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/analytics/monthly
+// ═══════════════════════════════════════════════════════════════════════════
 const getMonthlyAnalytics = async (req, res, next) => {
   try {
     const { uploadId } = req.query;
@@ -307,33 +358,33 @@ const getMonthlyAnalytics = async (req, res, next) => {
 
     if (!transactions.length) return res.json([]);
 
-    // Future-date guard: strip transactions > 365 days ahead
-    const monthlyCutoff = new Date();
-    monthlyCutoff.setFullYear(monthlyCutoff.getFullYear() + 1);
-    const cleanTx = transactions.filter((t) => new Date(t.date) <= monthlyCutoff);
+    // Future-date guard
+    const monthlyCutoff = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59, 999);
+    const cleanTx = transactions.filter((t) => {
+      const d = normDate(t);
+      return d !== null && d <= monthlyCutoff;
+    });
 
-    // Group by month — filter each group independently
     const monthMap = {};
     cleanTx.forEach((t) => {
-      const d = new Date(t.date);
+      const d = normDate(t);
+      if (!d) return;
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 
       if (!monthMap[key]) monthMap[key] = { key, month: label, income: 0, expenses: 0 };
 
-      // Type-based, sign-agnostic accounting
-      const amt = normAmt(t);
-      if ((t.type || t.category || '').trim().toLowerCase() === 'income')  monthMap[key].income   += amt;
-      if ((t.type || t.category || '').trim().toLowerCase() === 'expense') monthMap[key].expenses += amt;
+      if (normType(t) === 'income') monthMap[key].income += normAmt(t);
+      if (normType(t) === 'expense') monthMap[key].expenses += normAmt(t);
     });
 
     const result = Object.values(monthMap)
       .sort((a, b) => a.key.localeCompare(b.key))
       .map((m) => ({
-        month:    m.month,
-        income:   Math.round(m.income * 100) / 100,
+        month: m.month,
+        income: Math.round(m.income * 100) / 100,
         expenses: Math.round(m.expenses * 100) / 100,
-        savings:  Math.round((m.income - m.expenses) * 100) / 100,
+        savings: Math.round((m.income - m.expenses) * 100) / 100,
       }));
 
     res.json(result);
@@ -342,18 +393,16 @@ const getMonthlyAnalytics = async (req, res, next) => {
   }
 };
 
-// ─── GET /api/analytics/categories ────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/analytics/categories
+// ═══════════════════════════════════════════════════════════════════════════
 const getCategoryBreakdown = async (req, res, next) => {
   try {
     const { uploadId } = req.query;
     const userId = req.user.id || req.user._id;
 
     if (isDbConnected()) {
-      // Type-based: match expense rows regardless of sign
-      const filter = {
-        ...txFilter(userId, uploadId),
-        type: 'expense',
-      };
+      const filter = { ...txFilter(userId, uploadId), type: { $in: ['expense', 'Expense'] } };
       const result = await Transaction.aggregate([
         { $match: filter },
         { $group: { _id: '$category', value: { $sum: { $abs: '$amount' } } } },
@@ -364,7 +413,7 @@ const getCategoryBreakdown = async (req, res, next) => {
       if (result.length) return res.json(result);
     }
 
-    // In-Memory Fallback
+    // In-memory fallback
     const uploads = await UploadStore.findByUserId(userId);
     let allTx = [];
     if (uploadId) {
@@ -377,18 +426,20 @@ const getCategoryBreakdown = async (req, res, next) => {
     if (allTx.length) {
       const catMap = {};
       allTx
-        .filter((t) => (t.type || t.category || '').trim().toLowerCase() === 'expense')
+        .filter((t) => normType(t) === 'expense')
         .forEach((t) => {
-          const cat = t.category || 'Other';
+          const cat = t.category || t.Category || 'Other';
           catMap[cat] = (catMap[cat] || 0) + normAmt(t);
         });
+
       const result = Object.entries(catMap)
         .map(([name, value]) => ({
-          name:  name.charAt(0).toUpperCase() + name.slice(1),
+          name: name.charAt(0).toUpperCase() + name.slice(1),
           value: Math.round(value * 100) / 100,
         }))
         .filter((c) => c.value > 0)
         .sort((a, b) => b.value - a.value);
+
       return res.json(result);
     }
 
@@ -398,7 +449,9 @@ const getCategoryBreakdown = async (req, res, next) => {
   }
 };
 
-// ─── GET /api/analytics/forecast ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/analytics/forecast
+// ═══════════════════════════════════════════════════════════════════════════
 const getForecast = async (req, res, next) => {
   try {
     const userId = req.user.id || req.user._id;
@@ -408,46 +461,37 @@ const getForecast = async (req, res, next) => {
       if (forecast) {
         let historicalIncome = forecast.historicalIncome || [];
 
-        // Fallback: derive historical income from income transactions if missing
         if (historicalIncome.length === 0) {
           const txs = await Transaction.find({
             userId,
-            type: 'income',  // type-based: no sign filter needed
+            type: { $in: ['income', 'Income'] },
           }).sort({ date: 1 });
 
           const monthMap = {};
           txs.forEach((t) => {
-            const key = new Date(t.date).toLocaleString('en-US', {
-              month: 'short',
-              year: 'numeric',
-            });
+            const d = normDate(t);
+            if (!d) return;
+            const key = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
             monthMap[key] = (monthMap[key] || 0) + normAmt(t);
           });
-          historicalIncome = Object.entries(monthMap).map(([month, income]) => ({
-            month,
-            income,
-          }));
+          historicalIncome = Object.entries(monthMap).map(([month, income]) => ({ month, income }));
         }
 
         return res.json({
-          model:                forecast.model,
-          generatedAt:          forecast.generatedAt,
-          predictions:          forecast.predictions,
+          model: forecast.model,
+          generatedAt: forecast.generatedAt,
+          predictions: forecast.predictions,
           historicalIncome,
-          volatility:           forecast.volatility || {
-            score: 0, fluctuationPct: 0, stabilityScore: 100, variance: 0,
-          },
-          bufferRecommendation: forecast.bufferRecommendation || {
-            emergencySavingsPct: 20, taxReservePct: 15,
-          },
-          insights:             forecast.insights || [],
-          isExpenseForecast:    forecast.isExpenseForecast || false,
-          stagesAvailable:      forecast.stagesAvailable || 0,
+          volatility: forecast.volatility || { score: 0, fluctuationPct: 0, stabilityScore: 100, variance: 0 },
+          bufferRecommendation: forecast.bufferRecommendation || { emergencySavingsPct: 20, taxReservePct: 15 },
+          insights: forecast.insights || [],
+          isExpenseForecast: forecast.isExpenseForecast || false,
+          stagesAvailable: forecast.stagesAvailable || 0,
         });
       }
     }
 
-    // In-Memory fallback
+    // In-memory fallback
     const uploads = await UploadStore.findByUserId(userId);
     const target = uploads[0];
     if (target && target.forecast) {
@@ -455,29 +499,29 @@ const getForecast = async (req, res, next) => {
       const predictions = [];
       if (fc.predicted_month && fc.predicted_month !== 'Insufficient Data') {
         predictions.push({
-          month:               fc.predicted_month,
-          predictedIncome:     Number(fc.predicted_income) || 0,
+          month: fc.predicted_month,
+          predictedIncome: Number(fc.predicted_income) || 0,
           recommendedSaveRate: target.recommendation?.recommended_reserve_rate || 0.10,
         });
       }
       return res.json({
-        model:                fc.model_used || 'WMA',
-        generatedAt:          new Date(),
+        model: fc.model_used || 'WMA',
+        generatedAt: new Date(),
         predictions,
-        historicalIncome:     fc.historical_income || [],
+        historicalIncome: fc.historical_income || [],
         volatility: {
-          score:          fc.volatility?.score || 0,
+          score: fc.volatility?.score || 0,
           fluctuationPct: fc.volatility?.fluctuation_pct || 0,
           stabilityScore: fc.volatility?.stability_score || 0,
-          variance:       fc.volatility?.variance || 0,
+          variance: fc.volatility?.variance || 0,
         },
         bufferRecommendation: {
           emergencySavingsPct: fc.buffer_recommendation?.emergency_savings_pct || 20,
-          taxReservePct:       fc.buffer_recommendation?.tax_reserve_pct || 15,
+          taxReservePct: fc.buffer_recommendation?.tax_reserve_pct || 15,
         },
-        insights:             fc.insights || [],
-        isExpenseForecast:    fc.is_expense_forecast || false,
-        stagesAvailable:      fc.stages_available || 0,
+        insights: fc.insights || [],
+        isExpenseForecast: fc.is_expense_forecast || false,
+        stagesAvailable: fc.stages_available || 0,
       });
     }
 
@@ -487,7 +531,9 @@ const getForecast = async (req, res, next) => {
   }
 };
 
-// ─── GET /api/analytics/ledger ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/analytics/ledger
+// ═══════════════════════════════════════════════════════════════════════════
 const getLedger = async (req, res, next) => {
   try {
     const userId = req.user.id || req.user._id;
@@ -496,14 +542,14 @@ const getLedger = async (req, res, next) => {
       const ledger = await Ledger.findOne({ userId }).sort({ month: -1 });
       if (ledger) {
         return res.json({
-          month:                    ledger.month,
-          totalIncome:              ledger.totalIncome,
-          totalExpenses:            ledger.totalExpenses,
-          safe_to_spend:            ledger.availableToSpend,
-          reserved_funds:           ledger.quarantinedForTaxes,
-          emergency_buffer:         ledger.emergencyBuffer,
+          month: ledger.month,
+          totalIncome: ledger.totalIncome,
+          totalExpenses: ledger.totalExpenses,
+          safe_to_spend: ledger.availableToSpend,
+          reserved_funds: ledger.quarantinedForTaxes,
+          emergency_buffer: ledger.emergencyBuffer,
           recommended_reserve_rate: ledger.saveRate,
-          monthly_burn:             ledger.monthlyBurn || 0,
+          monthly_burn: ledger.monthlyBurn || 0,
         });
       }
     }
@@ -511,17 +557,17 @@ const getLedger = async (req, res, next) => {
     const uploads = await UploadStore.findByUserId(userId);
     const target = uploads[0];
     if (target && target.recommendation) {
-      const rec  = target.recommendation;
+      const rec = target.recommendation;
       const summ = target.summary;
       return res.json({
-        month:                    'Current',
-        totalIncome:              summ.total_income,
-        totalExpenses:            summ.total_expenses,
-        safe_to_spend:            rec.safe_to_spend,
-        reserved_funds:           rec.reserved_funds,
-        emergency_buffer:         rec.emergency_buffer,
+        month: 'Current',
+        totalIncome: summ.total_income,
+        totalExpenses: summ.total_expenses,
+        safe_to_spend: rec.safe_to_spend,
+        reserved_funds: rec.reserved_funds,
+        emergency_buffer: rec.emergency_buffer,
         recommended_reserve_rate: rec.recommended_reserve_rate,
-        monthly_burn:             rec.monthly_burn || 0,
+        monthly_burn: rec.monthly_burn || 0,
       });
     }
 
@@ -531,7 +577,9 @@ const getLedger = async (req, res, next) => {
   }
 };
 
-// ─── GET /api/analytics/transactions ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/analytics/transactions
+// ═══════════════════════════════════════════════════════════════════════════
 const getTransactions = async (req, res, next) => {
   try {
     const { uploadId, page = 1, limit = 50, type, category, search } = req.query;
@@ -541,8 +589,11 @@ const getTransactions = async (req, res, next) => {
     if (isDbConnected()) {
       const filter = txFilter(userId, uploadId);
 
-      // Optional filters
-      if (type) filter.type = type;
+      // Normalize type filter to catch both cases stored in DB
+      if (type) {
+        const lc = type.toLowerCase();
+        filter.type = { $in: [lc, lc.charAt(0).toUpperCase() + lc.slice(1)] };
+      }
       if (category) filter.category = category;
       if (search) filter.description = { $regex: search, $options: 'i' };
 
@@ -557,7 +608,7 @@ const getTransactions = async (req, res, next) => {
         return res.json({
           transactions,
           total,
-          page:       parseInt(page),
+          page: parseInt(page),
           totalPages: Math.ceil(total / parseInt(limit)),
         });
       }
@@ -569,30 +620,33 @@ const getTransactions = async (req, res, next) => {
       const target = uploads.find((u) => u.uploadId === uploadId);
       if (target) allTx = [...target.txDocs];
     } else {
-      // Aggregate ALL uploads for the user
       allTx = uploads.reduce((acc, u) => acc.concat(u.txDocs), []);
     }
 
     if (allTx.length) {
-
-      // Apply in-memory filters
-      if (type)     allTx = allTx.filter((t) => t.type === type);
-      if (category) allTx = allTx.filter((t) => t.category === category);
-      if (search)   allTx = allTx.filter((t) =>
-        (t.description || '').toLowerCase().includes(search.toLowerCase())
+      if (type) allTx = allTx.filter((t) => normType(t) === type.toLowerCase());
+      if (category) allTx = allTx.filter((t) => (t.category || t.Category || '') === category);
+      if (search) allTx = allTx.filter((t) =>
+        (t.description || t.Description || '').toLowerCase().includes(search.toLowerCase())
       );
 
-      // Sort by date descending
-      allTx.sort((a, b) => new Date(b.date) - new Date(a.date));
+      allTx.sort((a, b) => {
+        const da = normDate(a);
+        const db = normDate(b);
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return db - da;
+      });
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
       const paginated = allTx.slice(skip, skip + parseInt(limit));
 
       return res.json({
         transactions: paginated,
-        total:        allTx.length,
-        page:         parseInt(page),
-        totalPages:   Math.ceil(allTx.length / parseInt(limit)),
+        total: allTx.length,
+        page: parseInt(page),
+        totalPages: Math.ceil(allTx.length / parseInt(limit)),
       });
     }
 
@@ -602,7 +656,9 @@ const getTransactions = async (req, res, next) => {
   }
 };
 
-// ─── GET /api/analytics/insights ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/analytics/insights
+// ═══════════════════════════════════════════════════════════════════════════
 const getInsights = async (req, res, next) => {
   try {
     const userId = req.user.id || req.user._id;
@@ -626,7 +682,9 @@ const getInsights = async (req, res, next) => {
   }
 };
 
-// ─── GET /api/analytics/cashflow ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/analytics/cashflow
+// ═══════════════════════════════════════════════════════════════════════════
 const getCashflow = async (req, res, next) => {
   try {
     const { uploadId, months = 6 } = req.query;
@@ -636,10 +694,7 @@ const getCashflow = async (req, res, next) => {
     if (isDbConnected()) {
       const since = new Date();
       since.setMonth(since.getMonth() - parseInt(months));
-      const filter = {
-        ...txFilter(userId, uploadId),
-        date: { $gte: since },
-      };
+      const filter = { ...txFilter(userId, uploadId), date: { $gte: since } };
       transactions = await Transaction.find(filter).sort({ date: 1 });
     }
 
@@ -653,48 +708,42 @@ const getCashflow = async (req, res, next) => {
       }
     }
 
-    if (!transactions.length) {
-      return res.json({ cashflow: [], net_trend: 'stable' });
-    }
+    if (!transactions.length) return res.json({ cashflow: [], net_trend: 'stable' });
 
-    // Group by month
     const monthMap = {};
     transactions.forEach((t) => {
-      const d = new Date(t.date);
+      const d = normDate(t);
+      if (!d) return;
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 
       if (!monthMap[key]) monthMap[key] = { key, month: label, income: 0, expenses: 0 };
 
-      // Type-based, sign-agnostic
-      const camt = normAmt(t);
-      if ((t.type || t.category || '').trim().toLowerCase() === 'income')  monthMap[key].income   += camt;
-      if ((t.type || t.category || '').trim().toLowerCase() === 'expense') monthMap[key].expenses += camt;
+      if (normType(t) === 'income') monthMap[key].income += normAmt(t);
+      if (normType(t) === 'expense') monthMap[key].expenses += normAmt(t);
     });
 
     const cashflow = Object.values(monthMap)
       .sort((a, b) => a.key.localeCompare(b.key))
       .map((m) => ({
-        month:      m.month,
-        income:     Math.round(m.income * 100) / 100,
-        expenses:   Math.round(m.expenses * 100) / 100,
-        net:        Math.round((m.income - m.expenses) * 100) / 100,
-        cumulative: 0, // filled below
+        month: m.month,
+        income: Math.round(m.income * 100) / 100,
+        expenses: Math.round(m.expenses * 100) / 100,
+        net: Math.round((m.income - m.expenses) * 100) / 100,
+        cumulative: 0,
       }));
 
-    // Compute cumulative net
     let cumul = 0;
     cashflow.forEach((m) => {
       cumul += m.net;
       m.cumulative = Math.round(cumul * 100) / 100;
     });
 
-    // Trend: compare first and last net
     let net_trend = 'stable';
     if (cashflow.length >= 2) {
       const first = cashflow[0].net;
-      const last  = cashflow[cashflow.length - 1].net;
-      if (last > first * 1.1)  net_trend = 'improving';
+      const last = cashflow[cashflow.length - 1].net;
+      if (last > first * 1.1) net_trend = 'improving';
       else if (last < first * 0.9) net_trend = 'declining';
     }
 
@@ -704,7 +753,9 @@ const getCashflow = async (req, res, next) => {
   }
 };
 
-// ─── GET /api/analytics/health-score ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/analytics/health-score
+// ═══════════════════════════════════════════════════════════════════════════
 const getHealthScore = async (req, res, next) => {
   try {
     const userId = req.user.id || req.user._id;
@@ -714,14 +765,13 @@ const getHealthScore = async (req, res, next) => {
       if (health) return res.json(health);
     }
 
-    // Compute a basic health score from in-memory data
     const uploads = await UploadStore.findByUserId(userId);
     const target = uploads[0];
 
     if (!target) return res.json({ overallScore: 0, label: 'No Data' });
 
     const summ = target.summary || {};
-    const income   = summ.total_income   || 0;
+    const income = summ.total_income || 0;
     const expenses = summ.total_expenses || 0;
 
     if (income === 0) return res.json({ overallScore: 0, label: 'No Income Data' });
@@ -731,16 +781,16 @@ const getHealthScore = async (req, res, next) => {
     let score = 0;
     let label = 'Poor';
 
-    if (savingsRate >= 30)      { score = 90; label = 'Excellent'; }
-    else if (savingsRate >= 20) { score = 75; label = 'Good';      }
-    else if (savingsRate >= 10) { score = 55; label = 'Fair';      }
-    else if (savingsRate >= 0)  { score = 30; label = 'Needs Work';}
-    else                        { score = 10; label = 'Critical';  }
+    if (savingsRate >= 30) { score = 90; label = 'Excellent'; }
+    else if (savingsRate >= 20) { score = 75; label = 'Good'; }
+    else if (savingsRate >= 10) { score = 55; label = 'Fair'; }
+    else if (savingsRate >= 0) { score = 30; label = 'Needs Work'; }
+    else { score = 10; label = 'Critical'; }
 
     res.json({
       overallScore: score,
       label,
-      savingsRate:  Math.round(savingsRate * 10) / 10,
+      savingsRate: Math.round(savingsRate * 10) / 10,
       income,
       expenses,
     });

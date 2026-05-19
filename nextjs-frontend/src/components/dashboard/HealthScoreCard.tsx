@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { useSpendNestStore } from '@/store/useSpendNestStore';
 import InsightsList from './InsightsList';
 
@@ -27,7 +27,7 @@ function ScoreGauge({ score, color }: { score: number; color: string }) {
         {/* Track */}
         <circle cx="60" cy="60" r={r} fill="none" stroke="#F1F5F9" strokeWidth="10" />
         {/* Progress */}
-        <motion.circle
+        <m.circle
           cx="60" cy="60" r={r}
           fill="none"
           stroke={color}
@@ -41,14 +41,14 @@ function ScoreGauge({ score, color }: { score: number; color: string }) {
       </svg>
       {/* Score text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span
+        <m.span
           className="text-4xl font-black text-slate-900 leading-none"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
           {score}
-        </motion.span>
+        </m.span>
         <span className="text-xs text-slate-400 font-medium mt-0.5">/100</span>
       </div>
     </div>
@@ -68,7 +68,7 @@ function SubScore({ label, score, max, delay }: { label: string; score: number; 
         <span className="text-slate-700 font-semibold">{displayScore}/{max}</span>
       </div>
       <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <motion.div
+        <m.div
           className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full"
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
@@ -92,6 +92,7 @@ interface Props {
     incomeScore: number;
     label: string;
     insights?: string[];
+    recommendations?: string[];
     trends?: {
       weekend_vs_weekday_pct?: number;
       rising_categories?: string[];
@@ -187,26 +188,26 @@ export default function HealthScoreCard({ score, loading }: Props) {
 
       <AnimatePresence>
         {showRecs && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
             <div className="mt-3 space-y-2">
-              {(score.recommendations || []).map((rec) => (
+              {(score.recommendations || []).map((rec: string) => (
                 <div key={rec} className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed">
                   <span className="text-indigo-600 mt-0.5 flex-shrink-0">→</span>
                   <span>{rec}</span>
                 </div>
               ))}
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* AI Insights & Trends */}
-      {(score.insights?.length > 0 || score.trends) && (
+      {((score.insights && score.insights.length > 0) || score.trends) && (
         <div className="mt-8 pt-6 border-t border-slate-100">
           <InsightsList insights={score.insights || []} trends={score.trends} />
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { TrendingUp, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -17,6 +17,8 @@ interface FinancialForecastChartProps {
 }
 
 export default function FinancialForecastChart({ data, loading = false }: FinancialForecastChartProps) {
+  const prefersReducedMotion = typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+
   if (loading || !data || data.length === 0) {
     return <div className="bg-white h-[400px] w-full animate-pulse rounded-[2.5rem] border border-slate-100" />;
   }
@@ -84,6 +86,8 @@ export default function FinancialForecastChart({ data, loading = false }: Financ
               cursor={{ stroke: '#E2E8F0', strokeWidth: 2 }}
             />
             <Line 
+              isAnimationActive={!prefersReducedMotion}
+              animationDuration={800}
               type="monotone" 
               dataKey="actual" 
               stroke="#2563EB" 
@@ -94,6 +98,8 @@ export default function FinancialForecastChart({ data, loading = false }: Financ
               connectNulls
             />
             <Line 
+              isAnimationActive={!prefersReducedMotion}
+              animationDuration={800}
               type="monotone" 
               dataKey="predicted" 
               stroke="#2563EB" 
@@ -120,14 +126,14 @@ export default function FinancialForecastChart({ data, loading = false }: Financ
         </div>
 
         {showWarning && (
-          <motion.div 
+          <m.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-3 p-5 bg-rose-50 border border-rose-100 rounded-2xl"
           >
             <AlertTriangle size={18} className="text-rose-500" />
             <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Volatility Alert: High Fluctuation</span>
-          </motion.div>
+          </m.div>
         )}
       </div>
     </div>
