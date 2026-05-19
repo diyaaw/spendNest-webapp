@@ -9,6 +9,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  webpack: (config) => {
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: ['**/.next/**', '**/node_modules/**', '**/dist/**', '**/build/**', '**/coverage/**'],
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

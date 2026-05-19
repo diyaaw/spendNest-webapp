@@ -8,7 +8,11 @@
     "*.log",
     "uploads/**",
     "tmp/**",
-    "node_modules/**"
+    "node_modules/**",
+    ".next/**",
+    "dist/**",
+    "build/**",
+    "coverage/**"
   ],
   "delay":  "1000",
   "env": {

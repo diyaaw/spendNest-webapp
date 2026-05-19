@@ -109,19 +109,29 @@ const connectDB = async () => {
     });
 
     // Graceful shutdown: only close on explicit process termination signals.
-    // NEVER close the connection inside a request handler.
+    // Use once() to ensure we don't try to close multiple times.
     const gracefulClose = async (signal) => {
-      console.log(`\n🛑 [${signal}] Closing MongoDB connection gracefully...`);
-      await mongoose.connection.close(false); // false = don't force-close active operations
-      console.log('   MongoDB connection closed. Exiting.');
-      process.exit(0);
+      console.log(`\n🛑 [${signal}] Closing MongoDB connection...`);
+      
+      // Set a hard timeout to prevent zombie processes if DB close hangs
+      const forceExitTimeout = setTimeout(() => {
+        console.warn('⚠️  MongoDB close timed out. Force exiting.');
+        process.exit(1);
+      }, 5000);
+
+      try {
+        await mongoose.connection.close(true); // true = force close active operations
+        console.log('   MongoDB connection closed. Exiting.');
+        clearTimeout(forceExitTimeout);
+        process.exit(0);
+      } catch (err) {
+        console.error('❌ Error during MongoDB close:', err.message);
+        process.exit(1);
+      }
     };
 
-    // Remove any old listeners first to prevent duplication across hot-reloads
-    process.removeAllListeners('SIGINT');
-    process.removeAllListeners('SIGTERM');
-    process.on('SIGINT',  () => gracefulClose('SIGINT'));
-    process.on('SIGTERM', () => gracefulClose('SIGTERM'));
+    process.once('SIGINT',  () => gracefulClose('SIGINT'));
+    process.once('SIGTERM', () => gracefulClose('SIGTERM'));
   }
 
   try {

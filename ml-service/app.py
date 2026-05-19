@@ -21,7 +21,6 @@ import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import pdfplumber
 
 # ── Our parsing pipeline ──────────────────────────────────────────────────────
 from app.utils.normalizer import normalize_dataframe
@@ -125,6 +124,7 @@ def _parse_pdf_bytes(content: bytes) -> pd.DataFrame:
     Tries to extract tables first. If that fails or results in empty data,
     it could potentially fall back to regex on text, but table extraction is preferred.
     """
+    import pdfplumber
     all_data = []
     try:
         with pdfplumber.open(io.BytesIO(content)) as pdf:
@@ -336,9 +336,8 @@ def parse_and_analyze():
     )
 
     # ── 11. Serialize ──────────────────────────────────────────────────────────
-    transactions = _safe_json(
-        df.where(pd.notnull(df), None).to_dict(orient="records")
-    )
+    import json
+    transactions = json.loads(df.to_json(orient="records", date_format="iso"))
 
     response_payload = {
         "success":            True,
@@ -437,5 +436,7 @@ def internal_error(err):
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    import os
     logger.info("🚀 Starting SpendNest ML Service on http://localhost:8000")
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    debug_mode = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    app.run(host="0.0.0.0", port=8000, debug=debug_mode, use_reloader=debug_mode, threaded=True)

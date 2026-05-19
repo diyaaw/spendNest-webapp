@@ -117,6 +117,7 @@ const uploadStatement = async (req, res, next) => {
   let mlResult;
   try {
     mlResult = await parseAndAnalyze(req.file.buffer, req.file.originalname);
+    req.file.buffer = null; // Free up memory immediately
   } catch (err) {
     console.error('❌ [Upload] ML service call failed:', err.message);
     if (err.code === 'ECONNREFUSED') {
@@ -273,26 +274,31 @@ const uploadStatement = async (req, res, next) => {
           recommendedSaveRate: Number(rec.recommended_reserve_rate) || 0.10,
         });
       }
-      await Forecast.create({
-        userId,
-        generatedAt: new Date(),
-        model: fc.model_used || 'WMA',
-        predictions,
-        historicalIncome: fc.historical_income || [],
-        stagesAvailable: fc.stages_available || 0,
-        isExpenseForecast: fc.is_expense_forecast || false,
-        volatility: {
-          score: fc.volatility?.score || 0,
-          fluctuationPct: fc.volatility?.fluctuation_pct || 0,
-          stabilityScore: fc.volatility?.stability_score || 0,
-          variance: fc.volatility?.variance || 0,
+      await Forecast.findOneAndUpdate(
+        { userId },
+        {
+          $set: {
+            generatedAt: new Date(),
+            model: fc.model_used || 'WMA',
+            predictions,
+            historicalIncome: fc.historical_income || [],
+            stagesAvailable: fc.stages_available || 0,
+            isExpenseForecast: fc.is_expense_forecast || false,
+            volatility: {
+              score: fc.volatility?.score || 0,
+              fluctuationPct: fc.volatility?.fluctuation_pct || 0,
+              stabilityScore: fc.volatility?.stability_score || 0,
+              variance: fc.volatility?.variance || 0,
+            },
+            bufferRecommendation: {
+              emergencySavingsPct: fc.buffer_recommendation?.emergency_savings_pct || 20,
+              taxReservePct: fc.buffer_recommendation?.tax_reserve_pct || 15,
+            },
+            insights: fc.insights || [],
+          }
         },
-        bufferRecommendation: {
-          emergencySavingsPct: fc.buffer_recommendation?.emergency_savings_pct || 20,
-          taxReservePct: fc.buffer_recommendation?.tax_reserve_pct || 15,
-        },
-        insights: fc.insights || [],
-      });
+        { upsert: true }
+      );
 
       // d) Financial Health
       await FinancialHealth.findOneAndUpdate(

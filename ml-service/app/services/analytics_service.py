@@ -46,10 +46,7 @@ def get_summary(df: pd.DataFrame) -> dict:
     if df is None or df.empty:
         return empty
 
-    # Normalize type strings (handles 'Income', 'INCOME', 'income', leading/trailing whitespace)
-    if "type" in df.columns:
-        df = df.copy()
-        df["type"] = df["type"].astype(str).str.lower().str.strip()
+
 
     # Type-based, sign-agnostic: abs() works for both positive-expense and negative-expense CSVs
     income_rows  = df[df["type"] == "income"]
@@ -126,15 +123,13 @@ def get_monthly_analytics(df: pd.DataFrame) -> list:
     if df is None or df.empty or "date" not in df.columns:
         return []
 
-    temp = df.copy()
+    cols = [c for c in ["date", "type", "amount"] if c in df.columns]
+    temp = df[cols].copy()
     temp["date"] = pd.to_datetime(temp["date"], errors="coerce")
     temp = temp.dropna(subset=["date"])
 
     if temp.empty:
         return []
-
-    # Normalize type strings before all comparisons
-    temp["type"] = temp["type"].astype(str).str.lower().str.strip()
     temp["month_period"] = temp["date"].dt.to_period("M")
     temp["month_display"] = temp["date"].dt.strftime("%b %Y")
 
@@ -180,15 +175,13 @@ def get_current_month_metrics(df: pd.DataFrame) -> dict:
     if df is None or df.empty or "date" not in df.columns:
         return empty
 
-    temp = df.copy()
+    cols = [c for c in ["date", "type", "amount"] if c in df.columns]
+    temp = df[cols].copy()
     temp["date"] = pd.to_datetime(temp["date"], errors="coerce")
     temp = temp.dropna(subset=["date"])
 
     if temp.empty:
         return empty
-
-    # Normalize type strings before all comparisons
-    temp["type"] = temp["type"].astype(str).str.lower().str.strip()
 
     # RULE: ALWAYS use the latest month present in the dataset for the label.
     # NEVER use datetime.now() — the server clock does not reflect the CSV data.
@@ -256,8 +249,8 @@ def get_category_breakdown(df: pd.DataFrame) -> list:
         return []
 
     # Type-based, sign-agnostic — handles positive-expense datasets
-    _df = df.copy()
-    _df["type"] = _df["type"].astype(str).str.lower().str.strip()
+    cols = [c for c in ["category", "type", "amount"] if c in df.columns]
+    _df = df[cols].copy()
     expense_df = _df[_df["type"] == "expense"]
     if expense_df.empty:
         return []
@@ -295,12 +288,12 @@ def detect_subscriptions(df: pd.DataFrame) -> list:
     if df is None or df.empty or "description" not in df.columns:
         return []
 
-    temp = df.copy()
+    cols = [c for c in ["date", "type", "amount", "description"] if c in df.columns]
+    temp = df[cols].copy()
     temp["date"] = pd.to_datetime(temp["date"], errors="coerce")
     temp = temp.dropna(subset=["date"])
 
     # Type-based, sign-agnostic — minimum abs(amount) >= 50 to filter micro-charges
-    temp["type"] = temp["type"].astype(str).str.lower().str.strip()
     expense_df = temp[
         (temp["type"] == "expense") & (temp["amount"].abs() >= 50)
     ].copy()
@@ -318,35 +311,40 @@ def detect_subscriptions(df: pd.DataFrame) -> list:
         .apply(lambda tokens: " ".join(tokens[:4]) if tokens else "")  # first 4 words
     )
 
-    groups = {}
+    from collections import defaultdict
+    prefix_groups = defaultdict(list)
     for _, row in expense_df.iterrows():
         key = row["desc_norm"]
         if not key or len(key) < 4:
             continue
-        amount = abs(float(row["amount"]))
-        date = row["date"]
+        prefix_groups[key[:6]].append(row)
 
-        # Find an existing group with similar amount (±10%)
-        matched_key = None
-        for gk, g in groups.items():
-            if not gk.startswith(key[:6]):
-                continue
-            base = g["base_amount"]
-            if base > 0 and abs(base - amount) / base <= 0.10:
-                matched_key = gk
-                break
+    groups = {}
+    for prefix, rows in prefix_groups.items():
+        for row in rows:
+            key = row["desc_norm"]
+            amount = abs(float(row["amount"]))
+            date = row["date"]
 
-        if matched_key is None:
-            matched_key = f"{key}_{round(amount)}"
-            groups[matched_key] = {
-                "description": str(row["description"]),
-                "base_amount": amount,
-                "amounts": [],
-                "dates": [],
-            }
+            matched_key = None
+            for gk, g in groups.items():
+                if gk.startswith(prefix):
+                    base = g["base_amount"]
+                    if base > 0 and abs(base - amount) / base <= 0.10:
+                        matched_key = gk
+                        break
 
-        groups[matched_key]["amounts"].append(amount)
-        groups[matched_key]["dates"].append(date)
+            if matched_key is None:
+                matched_key = f"{key}_{round(amount)}"
+                groups[matched_key] = {
+                    "description": str(row["description"]),
+                    "base_amount": amount,
+                    "amounts": [],
+                    "dates": [],
+                }
+
+            groups[matched_key]["amounts"].append(amount)
+            groups[matched_key]["dates"].append(date)
 
     subscriptions = []
     for key, g in groups.items():
@@ -425,7 +423,8 @@ def get_emergency_fund_analysis(df: pd.DataFrame, current_savings: float = 0.0) 
     if df is None or df.empty:
         return _empty_emergency_fund()
 
-    temp = df.copy()
+    cols = [c for c in ["date", "type", "amount", "balance"] if c in df.columns]
+    temp = df[cols].copy()
     temp["date"] = pd.to_datetime(temp["date"], errors="coerce")
     temp = temp.dropna(subset=["date"])
 
@@ -556,7 +555,8 @@ def get_spending_trends(df: pd.DataFrame) -> dict:
     if df is None or df.empty or "date" not in df.columns:
         return {}
 
-    temp = df.copy()
+    cols = [c for c in ["date", "type", "amount", "category"] if c in df.columns]
+    temp = df[cols].copy()
     temp["date"] = pd.to_datetime(temp["date"], errors="coerce")
     temp = temp.dropna(subset=["date"])
 
