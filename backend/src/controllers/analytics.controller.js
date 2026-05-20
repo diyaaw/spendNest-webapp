@@ -6,6 +6,19 @@ const { UploadStore } = require('../services/sharedStore');
 
 const { isDbConnected } = require('../config/db');
 
+const cache = new Map(); // cacheKey → { data, expiresAt }
+const getCached = (key) => {
+  const entry = cache.get(key);
+  if (entry && Date.now() < entry.expiresAt) return entry.data;
+  cache.delete(key);
+  return null;
+};
+const setCache = (key, data, ttlMs = 60_000) => {
+  cache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  // Evict old keys to prevent unbounded growth
+  if (cache.size > 100) cache.delete(cache.keys().next().value);
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // FIELD NORMALIZER
 // ═══════════════════════════════════════════════════════════════════════════
@@ -141,7 +154,8 @@ const logAccountingDiagnostics = (label, txList) => {
   }
 
   // Sample first 3 rows to help debug column mismatches in production
-  if ((income === 0 || expenses === 0) && txList.length > 0) {
+  const DEBUG = process.env.NODE_ENV !== 'production';
+  if (DEBUG && (income === 0 || expenses === 0) && txList.length > 0) {
     console.warn(`[${label}] 🔍 First 3 raw txn objects for inspection:`);
     txList.slice(0, 3).forEach((t, i) => {
       console.warn(`  [${i}]`, JSON.stringify({
@@ -171,6 +185,12 @@ const getSummary = async (req, res, next) => {
   try {
     const { uploadId } = req.query;
     const userId = req.user.id || req.user._id;
+
+    const cacheKey = `summary_${userId}_${uploadId || 'all'}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+    const originalJson = res.json.bind(res);
+    res.json = (body) => { setCache(cacheKey, body); return originalJson(body); };
 
     let transactions = [];
     let mlSummary = null;
@@ -341,6 +361,12 @@ const getMonthlyAnalytics = async (req, res, next) => {
     const { uploadId } = req.query;
     const userId = req.user.id || req.user._id;
 
+    const cacheKey = `monthly_${userId}_${uploadId || 'all'}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+    const originalJson = res.json.bind(res);
+    res.json = (body) => { setCache(cacheKey, body); return originalJson(body); };
+
     let transactions = [];
     if (isDbConnected()) {
       transactions = await Transaction.find(txFilter(userId, uploadId)).sort({ date: 1 });
@@ -400,6 +426,12 @@ const getCategoryBreakdown = async (req, res, next) => {
   try {
     const { uploadId } = req.query;
     const userId = req.user.id || req.user._id;
+
+    const cacheKey = `categories_${userId}_${uploadId || 'all'}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+    const originalJson = res.json.bind(res);
+    res.json = (body) => { setCache(cacheKey, body); return originalJson(body); };
 
     if (isDbConnected()) {
       const filter = { ...txFilter(userId, uploadId), type: { $in: ['expense', 'Expense'] } };
@@ -585,6 +617,12 @@ const getTransactions = async (req, res, next) => {
     const { uploadId, page = 1, limit = 50, type, category, search } = req.query;
     const userId = req.user.id || req.user._id;
 
+    const cacheKey = `transactions_${userId}_${uploadId || 'all'}_${page}_${limit}_${type || ''}_${category || ''}_${search || ''}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+    const originalJson = res.json.bind(res);
+    res.json = (body) => { setCache(cacheKey, body); return originalJson(body); };
+
     let transactions = [];
     if (isDbConnected()) {
       const filter = txFilter(userId, uploadId);
@@ -689,6 +727,12 @@ const getCashflow = async (req, res, next) => {
   try {
     const { uploadId, months = 6 } = req.query;
     const userId = req.user.id || req.user._id;
+
+    const cacheKey = `cashflow_${userId}_${uploadId || 'all'}_${months}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+    const originalJson = res.json.bind(res);
+    res.json = (body) => { setCache(cacheKey, body); return originalJson(body); };
 
     let transactions = [];
     if (isDbConnected()) {

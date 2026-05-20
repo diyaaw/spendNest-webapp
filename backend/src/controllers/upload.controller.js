@@ -146,7 +146,8 @@ const uploadStatement = async (req, res, next) => {
 
   // ── 4. Log first raw transaction from Flask for diagnostics ───────────────
   // This helps immediately spot column name mismatches during development.
-  console.log('🔍 [Upload] First raw transaction from Flask:', JSON.stringify(mlResult.transactions[0]));
+  const DEBUG = process.env.NODE_ENV !== 'production';
+  if (DEBUG) console.log('🔍 [Upload] First raw transaction from Flask:', JSON.stringify(mlResult.transactions[0]));
 
   // ── 5. Normalize + prepare transaction documents ───────────────────────────
   // THIS IS THE CRITICAL STEP.
@@ -219,13 +220,19 @@ const uploadStatement = async (req, res, next) => {
     });
 
   // Diagnostics: log aggregated totals from normalized txDocs
-  const diagIncome = txDocs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const diagExpenses = txDocs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  console.log(
-    `📊 [Upload] txDocs ready — total: ${txDocs.length} | ` +
-    `income txns: ${txDocs.filter(t => t.type === 'income').length} (₹${Math.round(diagIncome).toLocaleString()}) | ` +
-    `expense txns: ${txDocs.filter(t => t.type === 'expense').length} (₹${Math.round(diagExpenses).toLocaleString()})`
-  );
+  let incomeCount = 0, expenseCount = 0, diagIncome = 0, diagExpenses = 0;
+  for (const t of txDocs) {
+    if (t.type === 'income') { incomeCount++; diagIncome += t.amount; }
+    else if (t.type === 'expense') { expenseCount++; diagExpenses += t.amount; }
+  }
+  
+  if (DEBUG) {
+    console.log(
+      `📊 [Upload] txDocs ready — total: ${txDocs.length} | ` +
+      `income txns: ${incomeCount} (₹${Math.round(diagIncome).toLocaleString()}) | ` +
+      `expense txns: ${expenseCount} (₹${Math.round(diagExpenses).toLocaleString()})`
+    );
+  }
 
   if (txDocs.length === 0) {
     return res.status(422).json({

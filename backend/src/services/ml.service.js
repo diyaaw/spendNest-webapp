@@ -29,38 +29,15 @@ const parseAndAnalyze = async (fileBuffer, filename) => {
   console.log(`🤖 [ML] Forwarding '${filename}' (${fileBuffer.length} bytes) to ${endpoint}`);
 
   // ── Build multipart/form-data manually ──────────────────────────────────────
-  // The boundary is a random string that separates form fields in the body.
-  const boundary = `----FlowShieldBoundary${Date.now()}`;
-  const CRLF = '\r\n';
-
-  // Part header
-  const partHeader = [
-    `--${boundary}`,
-    `Content-Disposition: form-data; name="file"; filename="${filename}"`,
-    `Content-Type: text/csv`,
-    '',
-    '',
-  ].join(CRLF);
-
-  // Part footer
-  const partFooter = `${CRLF}--${boundary}--${CRLF}`;
-
-  const body = Buffer.concat([
-    Buffer.from(partHeader, 'utf-8'),
-    fileBuffer,
-    Buffer.from(partFooter, 'utf-8'),
-  ]);
+  const form = new FormData();
+  form.append('file', new Blob([fileBuffer], { type: 'text/csv' }), filename);
 
   // ── Send request ─────────────────────────────────────────────────────────────
   let response;
   try {
     response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        'Content-Length': String(body.length),
-      },
-      body,
+      body: form,
       signal: AbortSignal.timeout(60_000), // 60s — generous for large CSVs
     });
   } catch (err) {

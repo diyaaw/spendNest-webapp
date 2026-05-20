@@ -54,21 +54,23 @@ const UserStore = {
 
 const UploadStore = {
   create: async (data) => {
-    // Evict oldest if user already has >= 3 uploads to prevent memory bloat
-    const userUploads = storage.uploads.filter(u => String(u.userId) === String(data.userId));
-    if (userUploads.length >= 3) {
-      const sorted = userUploads.sort((a, b) => a.createdAt - b.createdAt);
-      const toRemove = sorted.slice(0, sorted.length - 2); // Keep latest 2
-      const toRemoveIds = new Set(toRemove.map(u => u._id));
-      storage.uploads = storage.uploads.filter(u => !toRemoveIds.has(u._id));
-    }
-
     const newUpload = {
       _id: `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       ...data,
       createdAt: new Date(),
     };
     storage.uploads.push(newUpload);
+
+    const MAX_UPLOADS_PER_USER = 3;
+    const userUploads = storage.uploads
+      .filter(u => String(u.userId) === String(data.userId))
+      .sort((a, b) => b.createdAt - a.createdAt);
+      
+    if (userUploads.length > MAX_UPLOADS_PER_USER) {
+      const toEvict = new Set(userUploads.slice(MAX_UPLOADS_PER_USER).map(u => u._id));
+      storage.uploads = storage.uploads.filter(u => !toEvict.has(u._id));
+    }
+
     return newUpload;
   },
 

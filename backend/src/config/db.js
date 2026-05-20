@@ -130,8 +130,13 @@ const connectDB = async () => {
       }
     };
 
-    process.once('SIGINT',  () => gracefulClose('SIGINT'));
-    process.once('SIGTERM', () => gracefulClose('SIGTERM'));
+    // Graceful shutdown: only close on explicit process termination signals.
+    const handleSIGINT = () => gracefulClose('SIGINT');
+    const handleSIGTERM = () => gracefulClose('SIGTERM');
+    process.off('SIGINT', handleSIGINT);
+    process.off('SIGTERM', handleSIGTERM);
+    process.on('SIGINT', handleSIGINT);
+    process.on('SIGTERM', handleSIGTERM);
   }
 
   try {
@@ -144,7 +149,7 @@ const connectDB = async () => {
       serverSelectionTimeoutMS:  10_000,   // 10 s to select a replica set member
       heartbeatFrequencyMS:      10_000,   // ping Atlas every 10 s to keep socket alive
       maxPoolSize:                   10,   // max concurrent operations per connection
-      minPoolSize:                    2,   // keep at least 2 sockets warm at all times
+      minPoolSize: process.env.NODE_ENV === 'production' ? 2 : 0,   // keep at least 2 sockets warm in prod
       maxIdleTimeMS:             60_000,   // close pooled sockets idle > 60 s
       retryWrites:               true,
       retryReads:                true,

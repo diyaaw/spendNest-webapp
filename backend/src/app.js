@@ -19,8 +19,10 @@ const app = express();
 // ─── Core Middlewares ────────────────────────────────────────────
 app.use(cors({
   origin: [
-    'http://localhost:3000',  // Next.js dev server
-    'http://localhost:5173',  // Vite (old frontend — kept for backwards compat)
+    'http://localhost:3000',  // Next.js dev server (localhost)
+    'http://127.0.0.1:3000',  // Next.js dev server (IPv4)
+    'http://localhost:5173',  // Vite (old frontend)
+    'http://127.0.0.1:5173',  // Vite (IPv4)
   ],
   credentials: true,
 }));

@@ -179,7 +179,7 @@ export default function RedesignedSubscriptionTracker() {
               >
                 {subs.map((sub, index) => (
                   <m.div
-                    key={sub.id ?? sub.description}
+                    key={sub.id ?? `${sub.description}-${index}`}
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0, transition: { delay: index * 0.04 } }}
                     className="group/item bg-slate-50/50 hover:bg-white border border-slate-50 hover:border-blue-100 p-4 rounded-2xl transition-all cursor-pointer hover:shadow-md"
