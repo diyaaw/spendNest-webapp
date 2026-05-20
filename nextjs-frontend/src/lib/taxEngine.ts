@@ -26,6 +26,14 @@ export interface TaxEstimate {
   surcharge: number;
   cess: number;
   totalLiability: number;
+  // Planning provision fields — used by the Advanced Estimator.
+  // These are the pre-rebate figures so the card never shows ₹0
+  // even when u/s 87A wipes the final legal liability.
+  taxBeforeRebate: number;  // raw slab tax before any rebate
+  rebate: number;           // u/s 87A rebate amount applied
+  provisionTax: number;     // taxBeforeRebate + 4% cess — the recommended reserve
+  provisionEffectiveRate: number; // provisionTax / grossAnnualIncome × 100
+  provisionMonthly: number; // provisionTax / 12
 }
 
 export interface AdvanceTaxSchedule {
@@ -102,20 +110,20 @@ export function estimateTax(
     tdsAlreadyDeducted?: number;
   } = {}
 ): TaxEstimate {
-  const { businessExpenseDeduction = 50_000, tdsAlreadyDeducted = 0 } = options;
+  const { tdsAlreadyDeducted = 0 } = options;
 
-  // Old regime: standard deduction of ₹50k for salary + actual business expenses
-  // New regime: flat ₹75k standard deduction (from Budget 2024)
-  const standardDeduction = regime === 'new' ? 75_000 : 50_000;
-  const totalDeduction = regime === 'new'
-    ? standardDeduction
-    : Math.max(standardDeduction, businessExpenseDeduction);
-
-  // Freelancer Presumptive Taxation (Section 44ADA):
-  // 50% of gross receipts is considered as profit.
+  // Section 44ADA — Presumptive Taxation for Professionals
+  // ─────────────────────────────────────────────────────────
+  // 50% of gross receipts is the deemed profit AND serves as the sole allowed
+  // deduction. No additional standard/salary deduction should be applied on top,
+  // because the 50% deemed expense already subsumes it.
+  //
+  // Correct formula: taxableIncome = grossIncome × 0.50
+  // (Slab rates then apply normally, including rebate u/s 87A.)
   const businessProfit = grossAnnualIncome * 0.5;
 
-  const taxableIncome = Math.max(0, businessProfit - totalDeduction);
+  // taxableIncome is the deemed profit — no further deduction under 44ADA.
+  const taxableIncome = Math.max(0, businessProfit);
   const slabs = regime === 'new' ? NEW_REGIME_SLABS : OLD_REGIME_SLABS;
   const slabBreakdown = computeSlabs(taxableIncome, slabs);
 
@@ -143,7 +151,21 @@ export function estimateTax(
 
   const monthlyReserve = Math.round(totalLiability / 12);
 
+  // ── Planning provision (pre-rebate) ──────────────────────────────────────────
+  // Under u/s 87A, low-income taxpayers get a full rebate making final liability ₹0.
+  // But as a prudent reserve, we still recommend setting aside the pre-rebate amount
+  // + cess. This is what the Advanced Estimator displays.
+  const provisionCess = Math.round(taxBeforeRebate * 0.04);
+  const provisionTax  = taxBeforeRebate + provisionCess;
+  const provisionEffectiveRate = grossAnnualIncome > 0
+    ? parseFloat(((provisionTax / grossAnnualIncome) * 100).toFixed(2))
+    : 0;
+  const provisionMonthly = Math.round(provisionTax / 12);
+
   // Advance tax schedule
+  // Use provisionTax for the schedule so instalments are also non-zero
+  // even when rebate makes the final legal liability ₹0.
+  const scheduleBase = provisionTax > totalLiability ? provisionTax : totalLiability;
   const advanceTax: AdvanceTaxSchedule[] = [
     { dueDate: '15 Jun',  percentage: 15, label: '1st Instalment' },
     { dueDate: '15 Sep',  percentage: 45, label: '2nd Instalment' },
@@ -151,11 +173,11 @@ export function estimateTax(
     { dueDate: '15 Mar',  percentage: 100, label: 'Final Instalment' },
   ].map((q, i, arr) => {
     const prevPct = i > 0 ? arr[i - 1].percentage : 0;
-    const amountDue = Math.round((totalLiability * (q.percentage - prevPct)) / 100);
+    const amountDue = Math.round((scheduleBase * (q.percentage - prevPct)) / 100);
     return {
       ...q,
       amountDue,
-      cumulative: Math.round(totalLiability * q.percentage / 100),
+      cumulative: Math.round(scheduleBase * q.percentage / 100),
     };
   });
 
@@ -175,6 +197,12 @@ export function estimateTax(
     surcharge,
     cess,
     totalLiability,
+    // Planning provision fields
+    taxBeforeRebate,
+    rebate,
+    provisionTax,
+    provisionEffectiveRate,
+    provisionMonthly,
   };
 }
 

@@ -48,7 +48,7 @@ const transactionSchema = new mongoose.Schema(
     // How the transaction entered the system
     source: {
       type: String,
-      enum: ['csv_upload', 'manual'],
+      enum: ['csv_upload', 'manual', 'statement_upload', 'api'],
       default: 'manual',
     },
     // Groups all transactions from the same CSV upload together

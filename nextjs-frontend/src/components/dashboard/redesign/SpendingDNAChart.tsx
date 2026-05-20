@@ -38,7 +38,15 @@ export default function SpendingDNAChart({ data }: { data: any[] }) {
 
   const totalSpend = chartData.reduce((acc, curr) => acc + curr.amount, 0);
 
-  if (chartData.length === 0) return null;
+  if (chartData.length === 0) return (
+    <div className="bg-white border border-slate-100 rounded-[2rem] p-6 md:p-8 h-full flex flex-col shadow-sm items-center justify-center min-h-[300px] group">
+      <div className="p-4 bg-slate-50 rounded-2xl mb-4 text-slate-300">
+        <PieIcon size={32} />
+      </div>
+      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">Spending DNA</p>
+      <p className="text-xs text-slate-400 font-bold mt-1 text-center">No category data yet.<br/>Upload a statement to see your spending breakdown.</p>
+    </div>
+  );
 
   const totalStr = Math.round(totalSpend).toLocaleString();
   const fontSizeClass = totalStr.length > 8 ? "text-xl" : "text-2xl";

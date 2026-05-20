@@ -118,23 +118,53 @@ const normalizeForecast = (raw: any): any => {
  * Normalize the backend ledger response to the recommendation shape the frontend expects.
  * DB shape:     { totalIncome, totalExpenses, availableToSpend, saveRate, emergencyBuffer, monthlyBurn }
  * Memory shape: { safe_to_spend, reserved_funds, emergency_buffer, message, ... }
+ *
+ * FORMULA (Bug #2 fix):
+ *   safeToSpend = totalIncome − totalExpenses − taxBuffer − savingsBuffer
+ *
+ * The ML service may return a safe_to_spend that hasn't had both buffers subtracted, so we
+ * re-derive it from the net balance minus reserved + emergency to ensure it can never exceed
+ * the net period balance (income − expenses).
  */
 const normalizeLedger = (raw: any, forecast: any): any => {
   if (!raw) return null;
-  // Already has the message field (from in-memory) - return as-is
-  if (raw.message !== undefined) return raw;
-  const reserved = raw.reserved_funds ?? raw.quarantinedForTaxes ?? 0;
-  // current_balance from DB ledger: totalIncome - totalExpenses (formula-based, matches backend)
-  const currentBal = (raw.totalIncome ?? 0) - (raw.totalExpenses ?? 0);
+
+  const reserved       = raw.reserved_funds      ?? raw.quarantinedForTaxes ?? 0;
+  const emergencyBuf   = raw.emergency_buffer     ?? raw.emergencyBuffer     ?? 0;
+  const monthlyBurn    = raw.monthly_burn         ?? raw.monthlyBurn         ?? 0;
+  const reserveRate    = raw.recommended_reserve_rate ?? raw.saveRate        ?? 0.10;
+  const predictedInc   = forecast?.predicted_income ?? 0;
+
+  // Both DB and in-memory ledger endpoints return totalIncome / totalExpenses directly.
+  // Use them to apply the definitive safe-to-spend formula:
+  //   taxBuffer     = totalIncome × 30%
+  //   savingsBuffer = totalIncome × 20%
+  //   safeToSpend   = totalIncome − totalExpenses − taxBuffer − savingsBuffer
+  //
+  // This intentionally produces a number LOWER than the net period balance
+  // (income − expenses), because 50% of income is ring-fenced for tax + savings.
+  const totalIncome   = raw.totalIncome   ?? 0;
+  const totalExpenses = raw.totalExpenses ?? 0;
+  const taxBuffer     = totalIncome * 0.30;
+  const savingsBuffer = totalIncome * 0.20;
+  const correctedSafe = Math.max(0, totalIncome - totalExpenses - taxBuffer - savingsBuffer);
+
+  const message = raw.message
+    ?? `Keep ₹${Math.round(reserved).toLocaleString('en-IN')} reserved for taxes & emergencies.`;
+
   return {
-    safe_to_spend:            raw.safe_to_spend ?? raw.availableToSpend ?? 0,
+    safe_to_spend:            correctedSafe,
     reserved_funds:           reserved,
-    emergency_buffer:         raw.emergency_buffer ?? raw.emergencyBuffer ?? 0,
-    recommended_reserve_rate: raw.recommended_reserve_rate ?? raw.saveRate ?? 0.10,
-    monthly_burn:             raw.monthly_burn ?? raw.monthlyBurn ?? 0,
-    message: `Keep \u20b9${Math.round(reserved).toLocaleString('en-IN')} reserved for taxes & emergencies.`,
-    current_balance:  currentBal,
-    predicted_income: forecast?.predicted_income ?? 0,
+    emergency_buffer:         emergencyBuf,
+    recommended_reserve_rate: reserveRate,
+    monthly_burn:             monthlyBurn,
+    message,
+    current_balance:          totalIncome - totalExpenses,
+    predicted_income:         predictedInc,
+    // preserve any extra fields (e.g. status, overdraft metadata) from ML path
+    ...(raw.status              !== undefined ? { status:             raw.status }              : {}),
+    ...(raw.is_negative_balance !== undefined ? { is_negative_balance: raw.is_negative_balance } : {}),
+    ...(raw.overdraft_amount    !== undefined ? { overdraft_amount:    raw.overdraft_amount }    : {}),
   };
 };
 

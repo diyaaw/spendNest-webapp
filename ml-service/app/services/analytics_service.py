@@ -272,18 +272,91 @@ def get_category_breakdown(df: pd.DataFrame) -> list:
     ]
 
 
-# ─── Subscription Detection ───────────────────────────────────────────────────
+
+# ── Subscription keyword dictionary (case-insensitive) ───────────────────────
+# Transactions matching any of these patterns are flagged as subscriptions
+# even if they appear only once in the dataset.
+_SUBSCRIPTION_KEYWORDS = [
+    # Streaming & Video
+    (r"netflix",                 "Netflix",            "streaming"),
+    (r"spotify",                 "Spotify",            "streaming"),
+    (r"hotstar|disney\+|disney plus", "Disney+ Hotstar", "streaming"),
+    (r"prime\s*video|amazon\s*prime", "Amazon Prime",  "streaming"),
+    (r"youtube\s*premium",       "YouTube Premium",    "streaming"),
+    (r"zee\s*5|zee5",            "ZEE5",               "streaming"),
+    (r"sonyliv",                 "SonyLIV",            "streaming"),
+    (r"apple\s*tv",              "Apple TV+",          "streaming"),
+    (r"jiocinema",               "JioCinema",          "streaming"),
+    (r"mxplayer",                "MX Player",          "streaming"),
+    # Music
+    (r"gaana",                   "Gaana",              "music"),
+    (r"jiosaavn|saavn",          "JioSaavn",           "music"),
+    (r"wynk",                    "Wynk Music",         "music"),
+    (r"apple\s*music",           "Apple Music",        "music"),
+    # SaaS / Productivity
+    (r"adobe",                   "Adobe",              "saas"),
+    (r"figma",                   "Figma",              "saas"),
+    (r"notion",                  "Notion",             "saas"),
+    (r"slack",                   "Slack",              "saas"),
+    (r"github",                  "GitHub",             "saas"),
+    (r"canva",                   "Canva",              "saas"),
+    (r"grammarly",               "Grammarly",          "saas"),
+    (r"zoom",                    "Zoom",               "saas"),
+    (r"chatgpt|openai",          "ChatGPT Plus",       "saas"),
+    (r"midjourney",              "Midjourney",         "saas"),
+    (r"linkedin\s*premium",      "LinkedIn Premium",   "saas"),
+    (r"dropbox",                 "Dropbox",            "saas"),
+    (r"google\s*one|google\s*workspace", "Google One", "saas"),
+    # Cloud
+    (r"\baws\b|amazon\s*web",    "AWS",                "cloud"),
+    (r"google\s*cloud|gcp",      "Google Cloud",       "cloud"),
+    (r"\bazure\b",               "Microsoft Azure",    "cloud"),
+    (r"digitalocean",            "DigitalOcean",       "cloud"),
+    (r"vercel",                  "Vercel",             "cloud"),
+    (r"netlify",                 "Netlify",            "cloud"),
+    # Food delivery subscriptions
+    (r"swiggy\s*one|swiggy\s*super", "Swiggy One",    "food"),
+    (r"zomato\s*pro|zomato\s*gold",  "Zomato Pro",    "food"),
+    # Fitness
+    (r"cult\.fit|curefit",       "Cult.fit",           "fitness"),
+    (r"fitpass",                 "Fitpass",            "fitness"),
+    # General subscription keyword (catch-all)
+    (r"\bsubscription\b",        "Subscription",       "other"),
+    (r"\brecharge\b",            "Recharge",           "telecom"),
+    (r"apple\b",                 "Apple",              "saas"),    # Apple services
+]
+
+import re as _re
+
+def _match_subscription_keyword(description: str):
+    """Returns (canonical_name, category) if description matches a keyword, else None."""
+    desc_lower = str(description).lower()
+    for pattern, name, category in _SUBSCRIPTION_KEYWORDS:
+        if _re.search(pattern, desc_lower):
+            return name, category
+    return None
+
 
 def detect_subscriptions(df: pd.DataFrame) -> list:
     """
-    Detects recurring subscription payments from transaction history.
+    Detects subscription payments from transaction history.
 
-    Criteria:
-      - Same merchant / description (normalized)
-      - Appears >= 2 times (flags at 2, marks as confirmed at 3+)
-      - Recurrence interval ≈ 25–35 days (monthly cadence)
+    Detection uses two complementary methods — results are merged and deduplicated:
 
-    Returns a list of detected subscriptions with monthly and yearly cost.
+    Method A — Keyword-first (Fix 1):
+      Any expense transaction whose description matches a known subscription
+      service keyword is flagged immediately, even if it appears only once.
+      No multi-month history required.
+
+    Method B — Recurrence-based (original logic, Fix 2 single-month fallback):
+      Groups transactions by normalized description + amount bucket (±10%).
+      Requires 2+ occurrences with a 25–40 day gap (monthly cadence), OR 3+
+      occurrences at any interval.
+      SKIPPED entirely when the dataset spans only 1 calendar month (single-
+      month fallback) — in that case only Method A runs.
+
+    Returns a list of subscription dicts with monthly/yearly cost, sorted by
+    monthly_cost descending.
     """
     if df is None or df.empty or "description" not in df.columns:
         return []
@@ -293,120 +366,187 @@ def detect_subscriptions(df: pd.DataFrame) -> list:
     temp["date"] = pd.to_datetime(temp["date"], errors="coerce")
     temp = temp.dropna(subset=["date"])
 
-    # Type-based, sign-agnostic — minimum abs(amount) >= 50 to filter micro-charges
+    # Filter to expense transactions with abs(amount) >= 50
     expense_df = temp[
         (temp["type"] == "expense") & (temp["amount"].abs() >= 50)
     ].copy()
-    expense_df["amount"] = expense_df["amount"].abs()  # normalize to positive
+    expense_df["amount"] = expense_df["amount"].abs()
 
     if expense_df.empty:
         return []
 
-    # Normalize descriptions
-    expense_df["desc_norm"] = (
-        expense_df["description"]
-        .str.lower()
-        .str.replace(r"[^a-z0-9]", " ", regex=True)
-        .str.split()
-        .apply(lambda tokens: " ".join(tokens[:4]) if tokens else "")  # first 4 words
-    )
+    # ── Determine data span for single-month fallback ─────────────────────────
+    distinct_months = expense_df["date"].dt.to_period("M").nunique()
+    single_month_only = (distinct_months <= 1)
+    if single_month_only:
+        logger.info(
+            "🔁 Subscription detection: single-month dataset — "
+            "skipping recurrence check, keyword-only mode active."
+        )
 
-    from collections import defaultdict
-    prefix_groups = defaultdict(list)
+    # ────────────────────────────────────────────────────────────────────────
+    # Method A: Keyword-first detection
+    # ────────────────────────────────────────────────────────────────────────
+    keyword_results = {}  # norm_key → subscription dict
+
     for _, row in expense_df.iterrows():
-        key = row["desc_norm"]
-        if not key or len(key) < 4:
+        match = _match_subscription_keyword(str(row["description"]))
+        if not match:
             continue
-        prefix_groups[key[:6]].append(row)
+        canonical_name, category = match
+        norm_key = canonical_name.lower().replace(" ", "")
+        amount = float(row["amount"])
+        date_str = row["date"].strftime("%Y-%m-%d")
 
-    groups = {}
-    for prefix, rows in prefix_groups.items():
-        for row in rows:
-            key = row["desc_norm"]
-            amount = abs(float(row["amount"]))
-            date = row["date"]
+        if norm_key not in keyword_results:
+            keyword_results[norm_key] = {
+                "description":  str(row["description"]),
+                "canonical":    canonical_name,
+                "category":     category,
+                "amounts":      [],
+                "dates":        [],
+            }
+        keyword_results[norm_key]["amounts"].append(amount)
+        keyword_results[norm_key]["dates"].append(row["date"])
 
-            matched_key = None
-            for gk, g in groups.items():
-                if gk.startswith(prefix):
-                    base = g["base_amount"]
-                    if base > 0 and abs(base - amount) / base <= 0.10:
-                        matched_key = gk
-                        break
-
-            if matched_key is None:
-                matched_key = f"{key}_{round(amount)}"
-                groups[matched_key] = {
-                    "description": str(row["description"]),
-                    "base_amount": amount,
-                    "amounts": [],
-                    "dates": [],
-                }
-
-            groups[matched_key]["amounts"].append(amount)
-            groups[matched_key]["dates"].append(date)
-
-    subscriptions = []
-    for key, g in groups.items():
-        dates = sorted(g["dates"])
-        if len(dates) < 2:
-            continue
-
-        # Calculate average gap between occurrences
-        gaps = [
-            (dates[i] - dates[i - 1]).days
-            for i in range(1, len(dates))
-        ]
-        avg_gap = sum(gaps) / len(gaps)
-
-        # Is it approximately monthly? (25–40 days)
-        is_monthly = 25 <= avg_gap <= 40
-
-        # Flag even non-monthly if appears 3+ times
-        if len(dates) < 3 and not is_monthly:
-            continue
-
+    method_a_subs = []
+    for norm_key, g in keyword_results.items():
         avg_amount = sum(g["amounts"]) / len(g["amounts"])
-
-        if is_monthly:
-            frequency = "monthly"
-            monthly_cost = avg_amount
-            yearly_cost = avg_amount * 12
-        elif avg_gap <= 9:
-            frequency = "weekly"
-            monthly_cost = avg_amount * 4.33
-            yearly_cost = avg_amount * 52
-        elif avg_gap <= 20:
-            frequency = "biweekly"
-            monthly_cost = avg_amount * 2.17
-            yearly_cost = avg_amount * 26
-        elif avg_gap <= 100:
-            frequency = "quarterly"
-            monthly_cost = avg_amount / 3
-            yearly_cost = avg_amount * 4
-        else:
-            frequency = "annual"
-            monthly_cost = avg_amount / 12
-            yearly_cost = avg_amount
-
-        subscriptions.append({
-            "description":    g["description"],
-            "amount":         round(avg_amount, 2),
-            "frequency":      frequency,
-            "monthly_cost":   round(monthly_cost, 2),
-            "yearly_cost":    round(yearly_cost, 2),
-            "occurrences":    len(dates),
-            "first_seen":     dates[0].strftime("%Y-%m-%d"),
-            "last_seen":      dates[-1].strftime("%Y-%m-%d"),
-            "avg_gap_days":   round(avg_gap, 1),
-            "is_confirmed":   len(dates) >= 3,
+        dates = sorted(g["dates"])
+        method_a_subs.append({
+            "description":  g["canonical"],   # use clean canonical name
+            "amount":       round(avg_amount, 2),
+            "frequency":    "monthly",         # default for keyword-matched
+            "monthly_cost": round(avg_amount, 2),
+            "yearly_cost":  round(avg_amount * 12, 2),
+            "occurrences":  len(dates),
+            "first_seen":   dates[0].strftime("%Y-%m-%d"),
+            "last_seen":    dates[-1].strftime("%Y-%m-%d"),
+            "avg_gap_days": 0.0,
+            "is_confirmed": len(dates) >= 2,
+            "source":       "keyword",
+            "_norm_key":    norm_key,          # used for dedup below
         })
 
-    # Sort by monthly cost descending
-    subscriptions.sort(key=lambda x: x["monthly_cost"], reverse=True)
+    logger.info(
+        "🔁 Method A (keyword): found %d subscription(s)", len(method_a_subs)
+    )
 
-    logger.info("🔁 Subscription detection: found %d recurring patterns", len(subscriptions))
-    return subscriptions
+    # ────────────────────────────────────────────────────────────────────────
+    # Method B: Recurrence-based detection (skipped for single-month data)
+    # ────────────────────────────────────────────────────────────────────────
+    method_b_subs = []
+
+    if not single_month_only:
+        expense_df["desc_norm"] = (
+            expense_df["description"]
+            .str.lower()
+            .str.replace(r"[^a-z0-9]", " ", regex=True)
+            .str.split()
+            .apply(lambda tokens: " ".join(tokens[:4]) if tokens else "")
+        )
+
+        from collections import defaultdict
+        prefix_groups = defaultdict(list)
+        for _, row in expense_df.iterrows():
+            key = row["desc_norm"]
+            if not key or len(key) < 4:
+                continue
+            prefix_groups[key[:6]].append(row)
+
+        groups = {}
+        for prefix, rows in prefix_groups.items():
+            for row in rows:
+                key = row["desc_norm"]
+                amount = abs(float(row["amount"]))
+                date = row["date"]
+
+                matched_key = None
+                for gk, g in groups.items():
+                    if gk.startswith(prefix):
+                        base = g["base_amount"]
+                        if base > 0 and abs(base - amount) / base <= 0.10:
+                            matched_key = gk
+                            break
+
+                if matched_key is None:
+                    matched_key = f"{key}_{round(amount)}"
+                    groups[matched_key] = {
+                        "description": str(row["description"]),
+                        "base_amount": amount,
+                        "amounts":     [],
+                        "dates":       [],
+                    }
+
+                groups[matched_key]["amounts"].append(amount)
+                groups[matched_key]["dates"].append(date)
+
+        for key, g in groups.items():
+            dates = sorted(g["dates"])
+            if len(dates) < 2:
+                continue
+
+            gaps = [(dates[i] - dates[i - 1]).days for i in range(1, len(dates))]
+            avg_gap = sum(gaps) / len(gaps)
+            is_monthly = 25 <= avg_gap <= 40
+
+            if len(dates) < 3 and not is_monthly:
+                continue
+
+            avg_amount = sum(g["amounts"]) / len(g["amounts"])
+
+            if is_monthly:
+                frequency, monthly_cost, yearly_cost = "monthly", avg_amount, avg_amount * 12
+            elif avg_gap <= 9:
+                frequency, monthly_cost, yearly_cost = "weekly",    avg_amount * 4.33, avg_amount * 52
+            elif avg_gap <= 20:
+                frequency, monthly_cost, yearly_cost = "biweekly",  avg_amount * 2.17, avg_amount * 26
+            elif avg_gap <= 100:
+                frequency, monthly_cost, yearly_cost = "quarterly", avg_amount / 3,    avg_amount * 4
+            else:
+                frequency, monthly_cost, yearly_cost = "annual",    avg_amount / 12,   avg_amount
+
+            method_b_subs.append({
+                "description":  g["description"],
+                "amount":       round(avg_amount, 2),
+                "frequency":    frequency,
+                "monthly_cost": round(monthly_cost, 2),
+                "yearly_cost":  round(yearly_cost, 2),
+                "occurrences":  len(dates),
+                "first_seen":   dates[0].strftime("%Y-%m-%d"),
+                "last_seen":    dates[-1].strftime("%Y-%m-%d"),
+                "avg_gap_days": round(avg_gap, 1),
+                "is_confirmed": len(dates) >= 3,
+                "source":       "recurrence",
+                "_norm_key":    key,
+            })
+
+        logger.info(
+            "🔁 Method B (recurrence): found %d subscription(s)", len(method_b_subs)
+        )
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Merge A + B — deduplicate by _norm_key (A takes priority)
+    # ────────────────────────────────────────────────────────────────────────
+    seen_keys = set()
+    merged = []
+    for sub in method_a_subs + method_b_subs:
+        nk = sub.get("_norm_key", sub["description"][:20])
+        if nk not in seen_keys:
+            seen_keys.add(nk)
+            # Strip internal dedup key before returning
+            clean = {k: v for k, v in sub.items() if k != "_norm_key"}
+            merged.append(clean)
+
+    merged.sort(key=lambda x: x["monthly_cost"], reverse=True)
+
+    logger.info(
+        "🔁 Subscription detection complete: %d total (%d keyword + %d recurrence, %d unique)",
+        len(merged), len(method_a_subs), len(method_b_subs), len(merged)
+    )
+    return merged
+
+
 
 
 # ─── Emergency Fund Analysis ──────────────────────────────────────────────────

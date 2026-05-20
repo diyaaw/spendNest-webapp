@@ -32,7 +32,7 @@ function LedgerContent() {
     if (!isNaN(a) && a > 0 && a <= available) { quarantineAmount(a); setQuarantineAmt(''); }
   };
 
-  const fmt = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmt = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">

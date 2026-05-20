@@ -14,7 +14,10 @@ function TaxContent() {
     fetchTaxEstimate()
       .then((res) => setTaxData(res))
       .catch(() => {
-        const fallback = data.summary?.total_income ? data.summary.total_income * 12 : 0;
+        // Use total_income directly — do NOT multiply by 12.
+        // total_income is the raw period total from the CSV; taxEngine receives
+        // it as grossAnnualIncome and applies 44ADA internally.
+        const fallback = data.summary?.total_income ?? 0;
         setTaxData({ grossAnnualIncome: fallback });
       });
   }, [data]);

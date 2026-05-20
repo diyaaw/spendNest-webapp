@@ -18,6 +18,18 @@ const setCache = (key, data, ttlMs = 60_000) => {
   // Evict old keys to prevent unbounded growth
   if (cache.size > 100) cache.delete(cache.keys().next().value);
 };
+/**
+ * Evict every cache entry that belongs to the given userId.
+ * Called by upload.controller immediately after a new CSV is persisted,
+ * so all analytics endpoints return fresh data on the next request.
+ */
+const clearUserCache = (userId) => {
+  const prefix = String(userId);
+  for (const key of cache.keys()) {
+    if (key.includes(prefix)) cache.delete(key);
+  }
+  console.log(`🗑️  [analytics cache] Cleared all entries for user ${prefix}`);
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FIELD NORMALIZER
@@ -853,4 +865,5 @@ module.exports = {
   getInsights,
   getCashflow,
   getHealthScore,
+  clearUserCache,
 };

@@ -93,7 +93,9 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
   const comparison = compareRegimes(customIncome);
   const estimate: TaxEstimate = comparison[regime];
   const other: TaxEstimate = comparison[regime === 'new' ? 'old' : 'new'];
-  const savings = Math.abs(estimate.totalTax - other.totalTax);
+  // Compare planning provisions (pre-rebate) across regimes so the
+  // "optimal choice" banner is also meaningful for low-income cases.
+  const savings = Math.abs(estimate.provisionTax - other.provisionTax);
   const currentDue = getCurrentAdvanceTaxDue(estimate);
 
   return (
@@ -161,12 +163,12 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
         </div>
       </div>
 
-      {/* Hero Stats - Modern Grid */}
+      {/* Hero Stats — uses planning provision (pre-rebate + cess) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: "Total Tax Liability", val: fmt(estimate.totalTax), icon: Calculator, color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-100" },
-          { label: "Effective Tax Rate", val: pct(estimate.effectiveRate), icon: Info, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
-          { label: "Monthly Provision", val: fmt(estimate.monthlyReserve), icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
+          { label: "Recommended Provision", val: fmt(estimate.provisionTax), icon: Calculator, color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-100" },
+          { label: "Effective Rate",         val: pct(estimate.provisionEffectiveRate), icon: Info, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
+          { label: "Monthly Provision",      val: fmt(estimate.provisionMonthly), icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
         ].map((item, i) => (
           <div key={i} className="bg-white border border-slate-100 rounded-3xl p-6 relative overflow-hidden group hover:shadow-xl transition-all">
              <div className={cn("mb-4 p-2.5 w-fit rounded-xl shadow-sm border", item.bg, item.color, item.border)}>
@@ -177,6 +179,21 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
           </div>
         ))}
       </div>
+
+      {/* Provision footnote — shown when rebate reduces legal liability below provision */}
+      {estimate.rebate > 0 && estimate.provisionTax > 0 && (
+        <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-100 rounded-2xl">
+          <Info size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-[10px] font-bold text-amber-700 leading-relaxed">
+            <span className="font-black uppercase tracking-wide">Provision vs. Legal Liability</span><br />
+            Your final tax liability after the u/s 87A rebate is{' '}
+            <span className="font-black">{fmt(estimate.totalLiability)}</span>. The{' '}
+            <span className="font-black">{fmt(estimate.provisionTax)}</span> shown above is a
+            prudent reserve recommendation — setting it aside ensures you are never caught
+            short if your income rises or rules change.
+          </p>
+        </div>
+      )}
 
       {/* Dynamic Savings Alert */}
       <AnimatePresence mode="wait">
@@ -235,8 +252,8 @@ export default function TaxEstimatorCard({ annualIncome = 0 }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Advance Tax Timeline */}
-      {estimate.totalTax > 0 && (
+      {/* Advance Tax Timeline — shown when there is a non-zero provision to plan for */}
+      {estimate.provisionTax > 0 && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Compliance Schedule</h4>

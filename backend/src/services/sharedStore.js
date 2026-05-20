@@ -59,18 +59,17 @@ const UploadStore = {
       ...data,
       createdAt: new Date(),
     };
+
+    // ── Bug #2 fix: replace, don't accumulate ────────────────────────────────
+    // Each new CSV upload should be the sole source of truth for that user.
+    // Keeping old uploads causes analytics to run on the union of all past CSVs,
+    // producing inflated income/expense totals (e.g. 144 txns instead of 13).
+    // Evict every prior upload for this user before inserting the new record.
+    storage.uploads = storage.uploads.filter(
+      (u) => String(u.userId) !== String(data.userId)
+    );
+
     storage.uploads.push(newUpload);
-
-    const MAX_UPLOADS_PER_USER = 3;
-    const userUploads = storage.uploads
-      .filter(u => String(u.userId) === String(data.userId))
-      .sort((a, b) => b.createdAt - a.createdAt);
-      
-    if (userUploads.length > MAX_UPLOADS_PER_USER) {
-      const toEvict = new Set(userUploads.slice(MAX_UPLOADS_PER_USER).map(u => u._id));
-      storage.uploads = storage.uploads.filter(u => !toEvict.has(u._id));
-    }
-
     return newUpload;
   },
 

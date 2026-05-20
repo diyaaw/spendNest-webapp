@@ -62,7 +62,15 @@ export function RedesignedTaxEstimator({ annualIncome, taxData }: { annualIncome
     return estimateTax(annualIncome || 0, 'new');
   }, [annualIncome, taxData]);
 
-  const displayTax = isFreelance ? estimate.totalLiability : estimate.annualIncome * 0.25;
+  // When Sec 44ADA is active and income is non-zero, always show at least a minimal advisory
+  // reserve (5% of deemed 50% profit) — so the card never reads ₹0 when income exists.
+  // The taxEngine now correctly uses 44ADA formula (no extra standard deduction).
+  const deemedProfit = (estimate.annualIncome || 0) * 0.5;
+  const liabilityFromEngine = isFreelance ? estimate.totalLiability : estimate.annualIncome * 0.25;
+  const fallbackAdvisory = isFreelance && estimate.totalLiability === 0 && deemedProfit > 0
+    ? Math.round(deemedProfit * 0.05) // 5% of deemed profit as minimum reserve advisory
+    : 0;
+  const displayTax = liabilityFromEngine > 0 ? liabilityFromEngine : fallbackAdvisory;
   const displayIncome = estimate.annualIncome;
   const displayRate = displayIncome > 0 ? (displayTax / displayIncome) * 100 : 0;
 

@@ -19,12 +19,23 @@ const getEmergencyFund = async (req, res, next) => {
     let avgMonthlyExpenses = 0;
 
     if (isDbConnected() && mongoose.Types.ObjectId.isValid(String(userId))) {
+      // Try the last 6 months first
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      const result = await Transaction.aggregate([
-        { $match: { userId: new mongoose.Types.ObjectId(String(userId)), type: { $in: ['expense', 'transfer'] }, date: { $gte: sixMonthsAgo } } },
+      let result = await Transaction.aggregate([
+        { $match: { userId: new mongoose.Types.ObjectId(String(userId)), type: { $in: ['expense', 'transfer', 'Expense', 'Transfer'] }, date: { $gte: sixMonthsAgo } } },
         { $group: { _id: { year: { $year: '$date' }, month: { $month: '$date' } }, monthlyTotal: { $sum: { $abs: '$amount' } } } }
       ]);
+
+      // If no results in the last 6 months (e.g. statement data is older),
+      // retry without the date filter to get an all-time average.
+      if (result.length === 0) {
+        result = await Transaction.aggregate([
+          { $match: { userId: new mongoose.Types.ObjectId(String(userId)), type: { $in: ['expense', 'transfer', 'Expense', 'Transfer'] } } },
+          { $group: { _id: { year: { $year: '$date' }, month: { $month: '$date' } }, monthlyTotal: { $sum: { $abs: '$amount' } } } }
+        ]);
+      }
+
       avgMonthlyExpenses = result.length > 0 ? result.reduce((s, m) => s + m.monthlyTotal, 0) / result.length : 0;
     }
 
@@ -34,7 +45,9 @@ const getEmergencyFund = async (req, res, next) => {
       if (target && target.txDocs) {
         const monthMap = {};
         target.txDocs.forEach(t => {
-          if (['expense', 'transfer'].includes(t.type)) {
+          // Case-insensitive type check
+          const tType = (t.type || '').toLowerCase();
+          if (['expense', 'transfer'].includes(tType)) {
             const date = new Date(t.date);
             if (!isNaN(date.getTime())) {
               const key = `${date.getFullYear()}-${date.getMonth()}`;
@@ -43,8 +56,6 @@ const getEmergencyFund = async (req, res, next) => {
           }
         });
         const months = Object.values(monthMap);
-        // If we have data across multiple months, average it. 
-        // If only one month, it might be the total sum of a small period, so we divide by 1.
         avgMonthlyExpenses = months.length > 0 ? months.reduce((a, b) => a + b, 0) / months.length : 0;
       }
     }

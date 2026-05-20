@@ -6,6 +6,7 @@ const Forecast = require('../models/Forecast.model');
 const FinancialHealth = require('../models/FinancialHealth.model');
 const AuditLog = require('../models/AuditLog.model');
 const { UploadStore } = require('../services/sharedStore');
+const { clearUserCache } = require('./analytics.controller');
 
 const { isDbConnected } = require('../config/db');
 
@@ -249,8 +250,14 @@ const uploadStatement = async (req, res, next) => {
   // ── 6. Persist (MongoDB vs In-Memory) ─────────────────────────────────────
   if (isDbConnected()) {
     try {
-      // a) Transactions — batch insert
+      // a) Transactions — delete previous batch for this user, then insert fresh
+      // This ensures each upload is a clean replace (not an accumulation).
+      // Without this, uploading the same CSV twice doubles all income/expense totals.
+      await Transaction.deleteMany({ userId });
       await Transaction.insertMany(txDocs);
+
+      // b) Bust analytics cache so next API call sees fresh data immediately
+      clearUserCache(userId);
 
       // b) Ledger — upsert current month
       const now = new Date();
@@ -351,6 +358,8 @@ const uploadStatement = async (req, res, next) => {
       monthlyAnalytics: mlResult.monthly_analytics || [],
       currentMonth: mlResult.current_month || {},
     });
+    // Bust analytics cache so next request sees fresh data
+    clearUserCache(userId);
     console.log(`✅ [Upload] Persisted to In-Memory store (batch: ${uploadId})`);
   }
 
