@@ -81,6 +81,11 @@ const UploadStore = {
 
   findByUploadId: async (uploadId) => {
     return storage.uploads.find(u => String(u.uploadId) === String(uploadId)) || null;
+  },
+
+  clearAll: async () => {
+    storage.uploads.length = 0;
+    storage.emergencyFunds.length = 0;
   }
 };
 

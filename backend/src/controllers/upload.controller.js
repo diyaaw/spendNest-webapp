@@ -114,6 +114,23 @@ const uploadStatement = async (req, res, next) => {
   const userId = req.user.id || req.user._id;
   const uploadId = crypto.randomUUID();
 
+  // Reset in-memory store before processing
+  await UploadStore.clearAll();
+
+  // Delete all old data from MongoDB
+  if (isDbConnected()) {
+    try {
+      await Transaction.deleteMany({ userId });
+      await Ledger.deleteMany({ userId });
+      await Forecast.deleteMany({ userId });
+      await FinancialHealth.deleteMany({ userId });
+      await AuditLog.deleteMany({ userId });
+      console.log(`🧹 [Upload] Cleared all old database records for user ${userId}`);
+    } catch (e) {
+      console.error('❌ [Upload] Error clearing database:', e.message);
+    }
+  }
+
   // ── 2. Forward CSV to Flask ML service ────────────────────────────────────
   let mlResult;
   try {

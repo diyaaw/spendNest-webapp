@@ -240,15 +240,20 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
         # Indian bank statements always use DD/MM/YYYY or DD-MM-YYYY.
         # Try dayfirst=True FIRST so "03/09/25" correctly parses as Sep 3 2025
         # rather than Mar 9 2025 (the pandas default / US format).
-        dates = pd.to_datetime(raw_date_series, errors="coerce", dayfirst=True)
-
-        # If that still fails for the majority, try the ISO / US default
-        if dates.isna().sum() > (len(dates) / 2):
-            logger.warning(
-                "dayfirst=True left %.0f%% NaT — retrying with dayfirst=False",
-                100 * dates.isna().sum() / max(len(dates), 1),
-            )
-            dates = pd.to_datetime(raw_date_series, errors="coerce", dayfirst=False)
+        # HOWEVER, if the string starts with YYYY (ISO format), dayfirst=True
+        # wrongly parses YYYY-MM-DD as YYYY-DD-MM.
+        is_iso = raw_date_series.astype(str).str.match(r"^\d{4}[-/]").mean() > 0.5
+        
+        if is_iso:
+            dates = pd.to_datetime(raw_date_series, errors="coerce")
+        else:
+            dates = pd.to_datetime(raw_date_series, errors="coerce", dayfirst=True)
+            if dates.isna().sum() > (len(dates) / 2):
+                logger.warning(
+                    "dayfirst=True left %.0f%% NaT — retrying with dayfirst=False",
+                    100 * dates.isna().sum() / max(len(dates), 1),
+                )
+                dates = pd.to_datetime(raw_date_series, errors="coerce", dayfirst=False)
 
         # ── Future-date guard ────────────────────────────────────────────────
         # Any date parsed more than 365 days in the future is almost certainly

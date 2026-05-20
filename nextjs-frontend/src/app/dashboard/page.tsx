@@ -190,12 +190,12 @@ function RedesignedDashboardContent() {
           <div className="lg:col-span-1 flex flex-col gap-2">
             <RedesignedKpiCard 
               title="Net Period Balance"
-              amount={latestBalance}
-              isOverdraft={isOverdraft}
+              amount={(summary?.total_income ?? 0) - (summary?.total_expenses ?? 0)}
+              isOverdraft={((summary?.total_income ?? 0) - (summary?.total_expenses ?? 0)) < 0}
               subtext={
-                isOverdraft
+                ((summary?.total_income ?? 0) - (summary?.total_expenses ?? 0)) < 0
                   ? "Account Overdrawn"
-                  : "Income − Expenses − Tax Buffer − Savings Buffer"
+                  : "Income − Expenses"
               }
               icon={<Wallet size={20} />}
             />

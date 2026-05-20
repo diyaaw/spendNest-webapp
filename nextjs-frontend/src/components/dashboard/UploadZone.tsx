@@ -13,7 +13,7 @@ export default function UploadZone() {
   const [isDragging, setIsDragging] = useState(false);
   const [bankName, setBankName] = useState('Main Account');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { setDashboardData } = useSpendNestStore();
+  const { setDashboardData, clearDashboardData } = useSpendNestStore();
 
   const handleFile = (selectedFile: File | null) => {
     if (selectedFile) {
@@ -33,6 +33,10 @@ export default function UploadZone() {
     if (!file) return;
     setIsUploading(true);
     setError('');
+    
+    // Clear Zustand store before upload
+    clearDashboardData();
+
     try {
       const data = await uploadStatementFile(file, bankName);
       setDashboardData(data);
