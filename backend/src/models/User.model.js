@@ -21,6 +21,14 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
+    // ── Refresh Token Rotation ─────────────────────────────────────
+    // Stores hashed refresh tokens so we can rotate & revoke them server-side
+    refreshTokens: {
+      type: [String],
+      select: false,
+      default: [],
+    },
+
     // ── Step 1 — Location & Currency ──────────────────────────────
     country: { type: String, default: 'IN' },
     state: { type: String, default: '' },

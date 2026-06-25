@@ -44,15 +44,8 @@ app = Flask(__name__)
 
 CORS(
     app,
-    origins=[
-        "http://localhost:3000",   # Next.js frontend
-        "http://127.0.0.1:3000",
-        "http://localhost:5000",   # Express API gateway
-        "http://127.0.0.1:5000",
-        "http://localhost:5173",   # Vite dev server (legacy)
-        "http://127.0.0.1:5173",
-    ],
-    supports_credentials=True,
+    origins="*",  # Allow all origins in production (frontend on Vercel, backend on Render)
+    supports_credentials=False,  # Must be False when origins="*"
 )
 
 # ── Structured logging ────────────────────────────────────────────────────────
@@ -121,46 +114,105 @@ def _parse_csv_bytes(content: bytes) -> pd.DataFrame:
 def _parse_pdf_bytes(content: bytes) -> pd.DataFrame:
     """
     Parse PDF bytes using pdfplumber.
-    Tries to extract tables first. If that fails or results in empty data,
-    it could potentially fall back to regex on text, but table extraction is preferred.
+
+    Strategy:
+    1. Try strict table extraction (best for bank statement PDFs with bordered tables).
+    2. If no tables found, try lenient extraction with custom settings.
+    3. If still nothing, attempt text-based regex parsing as a last resort.
     """
-    import pdfplumber
-    all_data = []
+    try:
+        import pdfplumber
+    except ImportError:
+        logger.error("❌ pdfplumber not installed. Run: pip install pdfplumber")
+        return pd.DataFrame()
+
+    HEADER_KEYWORDS = {'date', 'description', 'amount', 'balance', 'debit', 'credit',
+                       'narration', 'particulars', 'withdrawal', 'deposit', 'remarks'}
+
+    def _rows_to_df(rows: list) -> pd.DataFrame | None:
+        """Convert a list of row-lists into a DataFrame, auto-detecting header row."""
+        if not rows:
+            return None
+        # Filter out fully empty rows
+        rows = [r for r in rows if any(cell and str(cell).strip() not in ('', 'None') for cell in r)]
+        if not rows:
+            return None
+        df = pd.DataFrame(rows)
+        # Try to find the header row (first row with 2+ recognized keywords)
+        header_idx = None
+        for i, row in df.iterrows():
+            row_vals = [str(v).lower().strip() for v in row if v is not None]
+            hits = sum(1 for v in row_vals if any(k in v for k in HEADER_KEYWORDS))
+            if hits >= 2:
+                header_idx = i
+                break
+        if header_idx is not None:
+            df.columns = df.iloc[header_idx].astype(str).str.strip()
+            df = df.iloc[header_idx + 1:].reset_index(drop=True)
+        # Drop rows that are all None/NaN/empty strings
+        df = df.replace({None: pd.NA, '': pd.NA, 'None': pd.NA})
+        df = df.dropna(how='all')
+        return df if not df.empty else None
+
+    all_rows: list = []
     try:
         with pdfplumber.open(io.BytesIO(content)) as pdf:
+            logger.info("📄 PDF opened: %d pages", len(pdf.pages))
+
+            # ── Strategy 1: Strict table extraction ──────────────────────────
             for page in pdf.pages:
                 tables = page.extract_tables()
                 for table in tables:
                     if table:
-                        # Convert table to DataFrame
-                        # We assume the first row might be headers or just data
-                        df_table = pd.DataFrame(table)
-                        all_data.append(df_table)
-        
-        if not all_data:
-            logger.warning("⚠️  No tables found in PDF")
-            return pd.DataFrame()
+                        all_rows.extend(table)
 
-        # Combine all tables
-        combined_df = pd.concat(all_data, ignore_index=True)
-        
-        # Basic cleanup: remove rows that are mostly None/NaN
-        combined_df = combined_df.dropna(how='all')
-        
-        # If the first row looks like headers (contains words like Date, Description, Amount), set it as header
-        if not combined_df.empty:
-            first_row = combined_df.iloc[0].astype(str).str.lower()
-            if any(h in first_row.values for h in ['date', 'description', 'amount', 'balance']):
-                combined_df.columns = combined_df.iloc[0]
-                combined_df = combined_df[1:].reset_index(drop=True)
-            else:
-                # Assign generic names if no headers found
-                combined_df.columns = [f"col_{i}" for i in range(len(combined_df.columns))]
+            # ── Strategy 2: Lenient extraction if strict found nothing ───────
+            if not all_rows:
+                logger.warning("⚠️  Strict table extraction found nothing — trying lenient settings")
+                lenient_settings = {
+                    "vertical_strategy": "text",
+                    "horizontal_strategy": "text",
+                    "snap_tolerance": 5,
+                    "join_tolerance": 5,
+                }
+                for page in pdf.pages:
+                    tables = page.extract_tables(lenient_settings)
+                    for table in tables:
+                        if table:
+                            all_rows.extend(table)
 
-        return combined_df
+            # ── Strategy 3: Text-line regex parsing ──────────────────────────
+            if not all_rows:
+                logger.warning("⚠️  Table extraction failed — falling back to text-line parsing")
+                text_rows = []
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if not text:
+                        continue
+                    for line in text.split('\n'):
+                        # Split on 2+ whitespace characters (simulates columns)
+                        parts = [p.strip() for p in re.split(r'\s{2,}', line.strip()) if p.strip()]
+                        if len(parts) >= 3:
+                            text_rows.append(parts)
+                if text_rows:
+                    all_rows = text_rows
+
     except Exception as e:
-        logger.error(f"❌ PDF parse error: {e}")
+        logger.error("❌ PDF parse error: %s", e, exc_info=True)
         return pd.DataFrame()
+
+    if not all_rows:
+        logger.warning("⚠️  No data extracted from PDF after all strategies")
+        return pd.DataFrame()
+
+    result = _rows_to_df(all_rows)
+    if result is None:
+        logger.warning("⚠️  _rows_to_df returned empty after cleanup")
+        return pd.DataFrame()
+
+    logger.info("✅ PDF parsed: %d rows × %d cols. Columns: %s",
+                len(result), len(result.columns), list(result.columns))
+    return result
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────

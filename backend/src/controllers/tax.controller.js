@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction.model');
+const TaxProfile = require('../models/TaxProfile.model');
 
 const { isDbConnected } = require('../config/db');  // shared singleton - never define locally
 const { UploadStore } = require('../services/sharedStore');
@@ -167,12 +168,52 @@ const getTaxEstimate = async (req, res, next) => {
     const oldRegime = computeTax(grossIncome, 'old');
     const newRegime = computeTax(grossIncome, 'new');
 
+    const recommended = newRegime.totalTax <= oldRegime.totalTax ? 'new' : 'old';
+    const savings = Math.abs(oldRegime.totalTax - newRegime.totalTax);
+
+    // ── Persist to TaxProfile (upsert — one document per user) ───────────────
+    if (isDbConnected() && mongoose.Types.ObjectId.isValid(String(userId))) {
+      try {
+        await TaxProfile.findOneAndUpdate(
+          { userId },
+          {
+            $set: {
+              grossAnnualIncome: grossIncome,
+              taxableIncome:     newRegime.taxableIncome,
+              recommendedRegime: recommended,
+              regimeSavings:     savings,
+              oldRegime: {
+                totalTax:       oldRegime.totalTax,
+                cess:           oldRegime.cess,
+                effectiveRate:  oldRegime.effectiveRate,
+                monthlyReserve: oldRegime.monthlyReserve,
+                advanceTax:     oldRegime.advanceTax,
+              },
+              newRegime: {
+                totalTax:       newRegime.totalTax,
+                cess:           newRegime.cess,
+                effectiveRate:  newRegime.effectiveRate,
+                monthlyReserve: newRegime.monthlyReserve,
+                advanceTax:     newRegime.advanceTax,
+              },
+              gstRequired:  newRegime.gstRequired,
+              calculatedAt: new Date(),
+            },
+          },
+          { upsert: true }
+        );
+      } catch (dbErr) {
+        // Non-fatal — log but do not block the response
+        console.error('[Tax] TaxProfile upsert failed:', dbErr.message);
+      }
+    }
+
     res.json({
       grossAnnualIncome: grossIncome,
       old: oldRegime,
       new: newRegime,
-      recommended: newRegime.totalTax <= oldRegime.totalTax ? 'new' : 'old',
-      savings: Math.abs(oldRegime.totalTax - newRegime.totalTax),
+      recommended,
+      savings,
     });
   } catch (err) {
     next(err);

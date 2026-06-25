@@ -17,15 +17,30 @@ const aiRoutes            = require('./routes/ai.routes');
 const app = express();
 
 // ─── Core Middlewares ────────────────────────────────────────────
+const allowedOrigins = [
+  'http://localhost:3000',  // Next.js dev server (localhost)
+  'http://127.0.0.1:3000',  // Next.js dev server (IPv4)
+  'http://localhost:5173',  // Vite (old frontend)
+  'http://127.0.0.1:5173',  // Vite (IPv4)
+];
+
+// Add production Vercel URL if configured
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
-  origin: [
-    'http://localhost:3000',  // Next.js dev server (localhost)
-    'http://127.0.0.1:3000',  // Next.js dev server (IPv4)
-    'http://localhost:5173',  // Vite (old frontend)
-    'http://127.0.0.1:5173',  // Vite (IPv4)
-  ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || allowedOrigins.some(o => origin.endsWith('.vercel.app'))) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS: Origin ${origin} not allowed`));
+  },
   credentials: true,
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

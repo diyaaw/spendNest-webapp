@@ -1,8 +1,9 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Bell, LayoutGrid, Calendar, ShieldCheck } from 'lucide-react';
+import { useSpendNestStore } from '@/store/useSpendNestStore';
+import { Bell, LayoutGrid, Calendar, ShieldCheck, LogOut } from 'lucide-react';
 
 const LABELS: Record<string, string> = {
   dashboard: 'Overview',
@@ -17,7 +18,9 @@ const LABELS: Record<string, string> = {
 
 export default function DashboardHeader() {
   const pathname = usePathname();
-  const { user } = useAuthStore();
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
+  const { clearDashboardData } = useSpendNestStore();
   const segments = pathname.split('/').filter(Boolean);
   const currentLabel = LABELS[segments[segments.length - 1]] || 'Overview';
 
@@ -31,6 +34,12 @@ export default function DashboardHeader() {
     day: 'numeric',
     month: 'long'
   }).format(new Date());
+
+  const handleLogout = async () => {
+    clearDashboardData();
+    await logout();
+    router.replace('/login');
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white/70 backdrop-blur-xl border-b border-slate-100 px-10 py-5 flex items-center justify-between">
@@ -63,19 +72,29 @@ export default function DashboardHeader() {
       </div>
 
       {/* Right Section: Premium Actions & Identity */}
-      <div className="flex items-center gap-8">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4 md:gap-8">
+        <div className="flex items-center gap-2 md:gap-3">
           <button className="relative w-11 h-11 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all group">
             <Bell size={20} className="group-hover:scale-110 transition-transform" />
             <span className="absolute top-3 right-3 w-2 h-2 bg-rose-500 rounded-full border-2 border-white shadow-sm" />
           </button>
           
-          <button className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all group">
+          <button className="w-11 h-11 hidden md:flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all group">
             <LayoutGrid size={20} className="group-hover:rotate-90 transition-transform duration-500" />
+          </button>
+
+          {/* Logout button — visible only on mobile (sidebar has it on desktop) */}
+          <button
+            onClick={handleLogout}
+            title="Logout"
+            aria-label="Logout"
+            className="md:hidden w-11 h-11 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all group"
+          >
+            <LogOut size={20} className="group-hover:scale-110 transition-transform" />
           </button>
         </div>
         
-        <div className="flex items-center gap-4 group cursor-pointer pl-8 border-l border-slate-100">
+        <div className="flex items-center gap-4 group cursor-pointer pl-4 md:pl-8 border-l border-slate-100">
           <div className="text-right hidden sm:block">
             <p className="text-[11px] font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight">
               {user?.name || 'User Account'}

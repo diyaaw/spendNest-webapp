@@ -28,9 +28,16 @@ const parseAndAnalyze = async (fileBuffer, filename) => {
   const endpoint = `${ML_BASE_URL}/api/parse-and-analyze`;
   console.log(`🤖 [ML] Forwarding '${filename}' (${fileBuffer.length} bytes) to ${endpoint}`);
 
+  // ── Detect correct MIME type from extension ─────────────────────────────────
+  // Sending 'text/csv' for PDF files causes Flask to fail to parse them correctly.
+  const isPdf = filename.toLowerCase().endsWith('.pdf');
+  const mimeType = isPdf ? 'application/pdf' : 'text/csv';
+  // Give PDF files more time to parse (table extraction is slower)
+  const timeoutMs = isPdf ? 120_000 : 60_000;
+
   // ── Build multipart/form-data manually ──────────────────────────────────────
   const form = new FormData();
-  form.append('file', new Blob([fileBuffer], { type: 'text/csv' }), filename);
+  form.append('file', new Blob([fileBuffer], { type: mimeType }), filename);
 
   // ── Send request ─────────────────────────────────────────────────────────────
   let response;
@@ -38,7 +45,7 @@ const parseAndAnalyze = async (fileBuffer, filename) => {
     response = await fetch(endpoint, {
       method: 'POST',
       body: form,
-      signal: AbortSignal.timeout(60_000), // 60s — generous for large CSVs
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     // Network-level errors (ECONNREFUSED, timeout, etc.)

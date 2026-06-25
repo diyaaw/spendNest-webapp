@@ -14,21 +14,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const { user, fetchMe } = useAuthStore();
   const { setDashboardData, setHydrating } = useSpendNestStore();
-  const [authReady, setAuthReady] = useState(!!user);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      if (!user) {
+      // ── Step 1: Restore access token from the HttpOnly refreshToken cookie ──
+      // The access token lives in memory and is lost on every page refresh.
+      // We silently call /refresh-token to get a new one before making any
+      // authenticated requests. This is invisible to the user.
+      const EXPRESS = process.env.NEXT_PUBLIC_API_URL!;
+      try {
+        const refreshRes = await fetch(`${EXPRESS}/api/auth/refresh-token`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (refreshRes.ok) {
+          const { accessToken } = await refreshRes.json();
+          if (accessToken) {
+            useAuthStore.getState().setAccessToken(accessToken);
+          }
+        } else {
+          // Refresh token expired or invalid — send to login
+          if (!cancelled) router.replace('/login');
+          return;
+        }
+      } catch {
+        if (!cancelled) router.replace('/login');
+        return;
+      }
+
+      // ── Step 2: Verify/restore user identity with the fresh access token ────
+      if (!useAuthStore.getState().user) {
         await fetchMe();
-        const currentUser = useAuthStore.getState().user;
-        if (!currentUser) {
+        if (!useAuthStore.getState().user) {
           if (!cancelled) router.replace('/login');
           return;
         }
       }
 
+      // ── Step 3: Hydrate dashboard data ──────────────────────────────────────
       if (!cancelled) setHydrating(true);
       try {
         const data = await fetchDashboardData();
@@ -36,7 +62,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           setDashboardData(data);
         }
       } catch {
-        // Fallback or ignore
+        // Non-fatal — dashboard may have no data yet
       } finally {
         if (!cancelled) setHydrating(false);
       }
@@ -45,9 +71,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     })();
 
     return () => { cancelled = true; };
-  }, [user, fetchMe, router, setHydrating, setDashboardData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount — token restore must not re-trigger on state changes
 
-  if (!authReady && !user) {
+  if (!authReady) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
