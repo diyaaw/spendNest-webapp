@@ -26,7 +26,7 @@ const protect = async (req, res, next) => {
 
   try {
     // Verify against the ACCESS secret (not the refresh secret)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_for_access_token_dev_only');
 
     let user;
     if (isDbConnected()) {

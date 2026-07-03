@@ -57,7 +57,7 @@ const parseAndAnalyze = async (fileBuffer, filename) => {
       throw e;
     }
     if (isTimeout) {
-      const e = new Error('ML service timed out after 60s. The CSV may be too large.');
+      const e = new Error(`ML service timed out after ${timeoutMs / 1000}s. The file may be too large or complex.`);
       e.code = 'ETIMEDOUT';
       throw e;
     }

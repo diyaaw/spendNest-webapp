@@ -173,8 +173,11 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
     df = raw_df.copy()
 
     # ── Step 1: Normalize column headers ────────────────────────────────────
-    # Strip whitespace from column names (handles "Transaction Type " trailing spaces)
-    df.columns = df.columns.str.strip()
+    # Strip whitespace from column names (handles "Transaction Type " trailing spaces).
+    # IMPORTANT: PDF text-line parsing (Strategy 3) can produce integer column indices
+    # (0, 1, 2, …) when no header row is found. Convert everything to str first to
+    # prevent df.columns.str.strip() from crashing with a TypeError.
+    df.columns = df.columns.astype(str).str.strip()
     cols = df.columns.tolist()
     logger.info("Raw columns detected: %s", cols)
 
@@ -182,6 +185,7 @@ def normalize_dataframe(raw_df: pd.DataFrame) -> pd.DataFrame:
     # This does NOT modify df.columns — it is only used for _find_column lookups
     cols_lower = [c.lower() for c in cols]
     logger.info("Lowercase column names: %s", cols_lower)
+
 
     # ── Detect amount_single FIRST (exact match only) ──────────────────────
     # This prevents a column named "amount" from leaking into debit/credit

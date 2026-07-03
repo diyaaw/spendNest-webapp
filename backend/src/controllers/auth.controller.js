@@ -16,7 +16,7 @@ const { isDbConnected } = require('../config/db'); // shared singleton — never
  * Contains only the user id — keep the payload lean.
  */
 const signAccessToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, {
+  jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret_for_access_token_dev_only', {
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
   });
 
@@ -26,7 +26,7 @@ const signAccessToken = (id) =>
  * can't be used to mint new refresh tokens.
  */
 const signRefreshToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_REFRESH_SECRET, {
+  jwt.sign({ id }, process.env.JWT_REFRESH_SECRET || 'fallback_secret_for_refresh_token_dev_only', {
     expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   });
 
@@ -173,7 +173,7 @@ const refreshToken = async (req, res, next) => {
     // Verify the refresh token signature & expiry
     let decoded;
     try {
-      decoded = jwt.verify(incomingRefreshToken, process.env.JWT_REFRESH_SECRET);
+      decoded = jwt.verify(incomingRefreshToken, process.env.JWT_REFRESH_SECRET || 'fallback_secret_for_refresh_token_dev_only');
     } catch (err) {
       // Expired or tampered token — clear the cookie
       res.clearCookie('refreshToken', { path: '/api/auth' });
